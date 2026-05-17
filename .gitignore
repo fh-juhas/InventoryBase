@@ -1,0 +1,122 @@
+# ============================================================
+# InventoryMS — .gitignore
+# .NET 9 · ASP.NET Core MVC · Clean Architecture · SQL Server
+# ============================================================
+
+
+# ── Build output ─────────────────────────────────────────────
+bin/
+obj/
+out/
+
+
+# ── Visual Studio ────────────────────────────────────────────
+
+# Solution user options (machine-specific)
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# VS search index files (what you're seeing in your screenshot)
+.vs/
+*.vsidx
+*.vspscc
+*.vssscc
+
+# VS Code
+.vscode/
+
+# Rider
+.idea/
+*.DotSettings.user
+
+
+# ── ASP.NET Core ─────────────────────────────────────────────
+
+# Published output
+publish/
+**/publish/
+
+# Bundled static assets (generated at build)
+bundleconfig.json.bak
+
+# Rotativa — wkhtmltopdf binary (large binary, not source)
+**/Rotativa/wkhtmltopdf*
+**/Rotativa/*.exe
+
+
+# ── User uploads (runtime data, not source) ──────────────────
+InventoryMS.Web/wwwroot/uploads/
+
+
+# ── EF Core Migrations ───────────────────────────────────────
+# Keep migration C# files — they are source code
+# Only ignore the compiled snapshot if you prefer clean diffs
+# (comment out the line below to keep snapshots committed)
+# **/Migrations/*Snapshot.cs
+
+
+# ── Secrets & config ─────────────────────────────────────────
+# Never commit real connection strings or secrets
+appsettings.Production.json
+appsettings.Staging.json
+secrets.json
+*.pfx
+*.p12
+
+# User secrets (local dev only)
+**/Properties/launchSettings.json
+
+
+# ── NuGet ────────────────────────────────────────────────────
+*.nupkg
+*.snupkg
+**/packages/
+!**/packages/build/
+nuget.config.local
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# NuGet cache (not part of source)
+.nuget/
+
+
+# ── Test results ─────────────────────────────────────────────
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+coverage/
+
+
+# ── OS files ─────────────────────────────────────────────────
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Linux
+*~
+
+
+# ── Logs ─────────────────────────────────────────────────────
+*.log
+logs/
+
+
+**/CopilotIndices/
+*.db-shm
+*.db-wal
+*.cache
+*AssemblyInfo*.cs
+*AssemblyInfoInputs*
