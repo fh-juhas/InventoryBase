@@ -1,0 +1,78 @@
+@{
+    ViewData["Title"] = "Categories";
+    ViewData["NavId"] = "categories";
+    var isAdmin = User.IsInRole("Admin");
+}
+<div class="content">
+  <div class="page-head">
+    <div><h1 class="page-title">Categories</h1><div class="page-sub">Group products for reporting and filtering.</div></div>
+    <div class="page-actions"><a class="btn btn-primary" href="@Url.Action("Create","Category")">+ New category</a></div>
+  </div>
+  <div class="table-wrap">
+    <div class="table-toolbar">
+      <div class="search-box">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input id="search" placeholder="Search categories…"/>
+      </div>
+      <select class="select" id="filterStatus" style="width:150px">
+        <option value="">All statuses</option>
+        <option value="active">Active</option>
+        <option value="inactive">Inactive</option>
+      </select>
+      <div class="spacer"></div>
+      <span class="xs muted" id="rowCount"></span>
+    </div>
+    <div id="catTable"></div>
+  </div>
+</div>
+@section Scripts {
+<script>
+const isAdmin = @isAdmin.ToString().ToLower();
+let filters = { search: '', status: '' };
+
+const table = new Tabulator('#catTable', {
+  ajaxURL: '/Category/Data',
+  ajaxParams: () => ({ ...filters }),
+  ajaxResponse: (url, params, resp) => resp,
+  pagination: true, paginationMode: 'remote',
+  paginationSize: 20, paginationSizeSelector: [10, 20, 50],
+  sortMode: 'remote', layout: 'fitColumns',
+  placeholder: 'No categories found.',
+  columns: [
+    { title: 'Name',   field: 'name',   widthGrow: 2,
+      formatter: c => `<span class="bold">${c.getValue()}</span>` },
+    { title: 'Parent', field: 'parent', widthGrow: 2,
+      formatter: c => `<span class="muted">${c.getValue()}</span>` },
+    { title: 'Status', field: 'status', width: 120, formatter: badgeFormatter },
+    { title: '', field: 'hash', width: isAdmin ? 170 : 90,
+      hozAlign: 'right', headerSort: false,
+      formatter: cell => {
+        const h = cell.getValue();
+        let b = `<a href="/Category/Edit/${h}" class="btn btn-ghost btn-sm">Edit</a>`;
+        if (isAdmin) b += ` <button onclick="delCat('${h}')" class="btn btn-ghost btn-sm btn-danger">Delete</button>`;
+        return `<div class="row" style="justify-content:flex-end">${b}</div>`;
+      }
+    }
+  ]
+});
+
+table.on('dataProcessed', () => {
+  document.getElementById('rowCount').textContent = table.getDataCount('active') + ' rows';
+});
+
+let deb;
+document.getElementById('search').addEventListener('input', e => {
+  clearTimeout(deb); deb = setTimeout(() => { filters.search = e.target.value; table.setPage(1); }, 350);
+});
+document.getElementById('filterStatus').addEventListener('change', e => {
+  filters.status = e.target.value; table.setPage(1);
+});
+
+async function delCat(hash) {
+  if (!confirm('Delete this category?')) return;
+  const d = await apiPost('/Category/Delete/' + hash);
+  if (d.success) { toastr.success('Category deleted.'); table.replaceData(); }
+  else toastr.error(d.message || 'Delete failed.');
+}
+</script>
+}

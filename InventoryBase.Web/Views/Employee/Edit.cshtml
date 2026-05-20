@@ -1,0 +1,46 @@
+@model InventoryBase.Core.Entities.Employee
+@{ ViewData["Title"] = "Edit employee"; ViewData["NavId"] = "employees"; var hashId = (string)ViewBag.HashId; }
+<div class="content">
+  <div class="page-head">
+    <div><h1 class="page-title">Edit employee</h1><div class="page-sub">@Model.Name</div></div>
+    <div class="page-actions"><a class="btn" href="@Url.Action("Index","Employee")">Cancel</a></div>
+  </div>
+  <div style="max-width:600px">
+    <div class="card">
+      <div class="card-head"><div class="card-title">Employee details</div></div>
+      <div class="card-body">
+        <form method="post" asp-controller="Employee" asp-action="Edit" asp-route-id="@hashId">
+          @Html.AntiForgeryToken()
+          <div class="form-grid">
+            <div class="field span-2">
+              <label class="label">Full name <span class="req">*</span></label>
+              <input class="input" asp-for="Name"/>
+              <span asp-validation-for="Name" class="hint" style="color:var(--danger)"></span>
+            </div>
+            <div class="field"><label class="label">Role</label><input class="input" asp-for="Role"/></div>
+            <div class="field">
+              <label class="label">Salary (৳) <span class="req">*</span></label>
+              <input class="input mono" asp-for="Salary"/>
+              <span asp-validation-for="Salary" class="hint" style="color:var(--danger)"></span>
+            </div>
+            <div class="field"><label class="label">Phone</label><input class="input mono" asp-for="Phone"/></div>
+            <div class="field"><label class="label">Email</label><input class="input" asp-for="Email" type="email"/></div>
+            <div class="field">
+              <label class="label">Join date <span class="req">*</span></label>
+              <input class="input" asp-for="JoinDate" type="date"/>
+            </div>
+            <div class="field">
+              <label class="row" style="gap:8px;cursor:pointer">
+                <input asp-for="IsActive" type="checkbox"/> <span>Active</span>
+              </label>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:16px">
+            <button type="submit" class="btn btn-primary">Save changes</button>
+            <a class="btn" href="@Url.Action("Index","Employee")">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

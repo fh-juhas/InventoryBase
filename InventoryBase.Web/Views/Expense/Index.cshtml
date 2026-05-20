@@ -1,0 +1,145 @@
+@{
+    ViewData["Title"] = "Expenses"; ViewData["NavId"] = "expenses";
+    int  month = (int?)ViewBag.Month ?? DateTime.Now.Month;
+    int  year  = (int?)ViewBag.Year  ?? DateTime.Now.Year;
+    var months = System.Globalization.CultureInfo.InvariantCulture.DateTimeFormat.MonthNames.Take(12).ToArray();
+    var isAdmin = User.IsInRole("Admin");
+}
+<div class="content">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Expenses</h1>
+      <div class="page-sub">Monthly expense tracking — <span id="periodLabel">@months[month-1] @year</span></div>
+    </div>
+    <div class="page-actions">
+      <!-- Period picker -->
+      <form id="periodForm" method="get" asp-controller="Expense" asp-action="Index" style="display:flex;gap:8px">
+        <select class="select s2-month" name="month" id="monthPick" style="width:130px">
+          @for (int m = 1; m <= 12; m++) {
+            <option value="@m" selected="@(m==month)">@months[m-1]</option>
+          }
+        </select>
+        <select class="select s2-year" name="year" id="yearPick" style="width:90px">
+          @for (int y = DateTime.Now.Year; y >= DateTime.Now.Year - 3; y--) {
+            <option value="@y" selected="@(y==year)">@y</option>
+          }
+        </select>
+        <button type="submit" class="btn">Go</button>
+      </form>
+
+      <button id="btnGenerate" class="btn" style="display:none">Generate from templates</button>
+      <button id="btnConfirm"  class="btn btn-primary" style="display:none">Confirm &amp; lock</button>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <div class="table-toolbar">
+      <div class="search-box">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input id="search" placeholder="Search category…"/>
+      </div>
+      <select class="select" id="filterStatus" style="width:160px">
+        <option value="">All statuses</option>
+        <option value="draft">Draft</option>
+        <option value="confirmed">Confirmed</option>
+      </select>
+      <div class="spacer"></div>
+      <div class="bold" style="font-size:13px">Total: <span id="totalAmount" class="mono">৳ 0</span></div>
+    </div>
+    <div id="expTable"></div>
+  </div>
+
+  @if (isAdmin) {
+    <div style="margin-top:16px">
+      <a class="btn" href="@Url.Action("Templates","Expense")">Manage expense templates</a>
+    </div>
+  }
+</div>
+
+@section Scripts {
+<script>
+const MONTH = @month;
+const YEAR  = @year;
+const isAdmin = @isAdmin.ToString().ToLower();
+let filters = { month: MONTH, year: YEAR, search: '', status: '' };
+
+// Load summary (hasDraft, total) and show/hide action buttons
+async function loadSummary() {
+  const s = await fetch(`/Expense/MonthSummary?month=${MONTH}&year=${YEAR}`).then(r => r.json());
+  document.getElementById('totalAmount').textContent =
+    '৳ ' + parseFloat(s.total).toLocaleString('en-BD', { minimumFractionDigits: 2 });
+  document.getElementById('btnGenerate').style.display = (!s.hasDraft) ? '' : 'none';
+  document.getElementById('btnConfirm').style.display  = (s.hasDraft)  ? '' : 'none';
+}
+loadSummary();
+
+const table = new Tabulator('#expTable', {
+  ajaxURL: '/Expense/Data',
+  ajaxParams: () => ({ ...filters }),
+  ajaxResponse: (url, params, resp) => resp,
+  pagination: true, paginationMode: 'remote',
+  paginationSize: 20, paginationSizeSelector: [10, 20, 50],
+  sortMode: 'remote', layout: 'fitColumns',
+  placeholder: 'No expenses yet. Click "Generate from templates" to create them.',
+  columns: [
+    { title: 'Category',    field: 'category',    widthGrow: 2,
+      formatter: c => `<span class="bold">${c.getValue()}</span>` },
+    { title: 'Description', field: 'description', widthGrow: 2,
+      formatter: c => `<span class="muted">${c.getValue()}</span>` },
+    { title: 'Amount (৳)',  field: 'amount',       width: 160,
+      hozAlign: 'right',
+      formatter: (cell) => {
+        const row = cell.getRow().getData();
+        if (row.isDraft) {
+          return `<input type="number" class="input mono" style="width:130px;text-align:right;padding:4px 8px"
+            value="${parseFloat(cell.getValue()).toFixed(2)}" step="0.01"
+            data-hash="${row.hash}"
+            onchange="updateAmount(this)"
+            onclick="event.stopPropagation()"/>`;
+        }
+        return moneyFormatter(cell);
+      }
+    },
+    { title: 'Status', field: 'status', width: 120, formatter: badgeFormatter }
+  ]
+});
+
+let deb;
+document.getElementById('search').addEventListener('input', e => {
+  clearTimeout(deb); deb = setTimeout(() => { filters.search = e.target.value; table.setPage(1); }, 350);
+});
+document.getElementById('filterStatus').addEventListener('change', e => {
+  filters.status = e.target.value; table.setPage(1);
+});
+
+// Generate
+document.getElementById('btnGenerate').addEventListener('click', async () => {
+  const d = await apiPost('/Expense/Generate', { month: MONTH, year: YEAR });
+  toastr.success('Expenses generated.'); table.replaceData(); loadSummary();
+});
+
+// Confirm
+document.getElementById('btnConfirm').addEventListener('click', async () => {
+  if (!confirm(`Lock all expenses for ${MONTH}/${YEAR}? This cannot be undone.`)) return;
+  await apiPost('/Expense/Confirm', { month: MONTH, year: YEAR });
+  toastr.success('Expenses confirmed and locked.'); table.replaceData(); loadSummary();
+});
+
+// Inline amount update
+async function updateAmount(el) {
+  const val  = parseFloat(el.value);
+  const hash = el.dataset.hash;
+  if (isNaN(val) || val < 0) return;
+  const d = await apiPost('/Expense/UpdateAmount', { id: hash, amount: val });
+  if (d.success) {
+    el.style.borderColor = 'var(--success)';
+    setTimeout(() => el.style.borderColor = '', 1200);
+    loadSummary();
+  } else { toastr.error('Failed to update amount.'); }
+}
+
+// Select2 on period pickers
+$('#monthPick').select2({ minimumResultsForSearch: Infinity, width: '130px' });
+$('#yearPick').select2({ minimumResultsForSearch: Infinity, width: '90px' });
+</script>
+}

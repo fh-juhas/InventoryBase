@@ -1,0 +1,98 @@
+@{
+    ViewData["Title"] = "Products"; ViewData["NavId"] = "products";
+    var isAdmin = User.IsInRole("Admin");
+}
+<div class="content">
+  <div class="page-head">
+    <div><h1 class="page-title">Products</h1><div class="page-sub">All active and inactive SKUs.</div></div>
+    <div class="page-actions">
+      <a class="btn btn-primary" href="@Url.Action("Create","Product")">+ New product</a>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <div class="table-toolbar">
+      <div class="search-box">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input id="search" placeholder="Search name or SKU…"/>
+      </div>
+      <select class="select select2-cat" id="filterCat" style="width:200px">
+        <option value="">All categories</option>
+      </select>
+      <select class="select" id="filterStatus" style="width:150px">
+        <option value="">All statuses</option>
+        <option value="active">Active</option>
+        <option value="inactive">Inactive</option>
+      </select>
+      <div class="spacer"></div>
+      <span class="xs muted" id="rowCount"></span>
+    </div>
+    <div id="prodTable"></div>
+  </div>
+</div>
+@section Scripts {
+<script>
+const isAdmin = @isAdmin.ToString().ToLower();
+let filters = { search: '', category: '', status: '' };
+
+// Load category list into Select2
+$.getJSON('/Product/CategoryList', function(data) {
+  data.forEach(c => $('#filterCat').append(new Option(c.text, c.id)));
+  $('#filterCat').trigger('change');
+});
+$('#filterCat').select2({ placeholder: 'All categories', allowClear: true, width: '200px' });
+
+const table = new Tabulator('#prodTable', {
+  ajaxURL: '/Product/Data',
+  ajaxParams: () => ({ ...filters }),
+  ajaxResponse: (url, params, resp) => resp,
+  pagination: true, paginationMode: 'remote',
+  paginationSize: 20, paginationSizeSelector: [10, 20, 50, 100],
+  sortMode: 'remote', layout: 'fitColumns',
+  placeholder: 'No products found.',
+  columns: [
+    { title: 'SKU',      field: 'sku',       width: 110,
+      formatter: c => `<span class="mono">${c.getValue()}</span>` },
+    { title: 'Product',  field: 'name',      widthGrow: 3,
+      formatter: c => `<span class="bold">${c.getValue()}</span>` },
+    { title: 'Category', field: 'category',  widthGrow: 2,
+      formatter: c => `<span class="muted">${c.getValue()}</span>` },
+    { title: 'Unit',     field: 'unit',      width: 80,
+      formatter: c => `<span class="muted">${c.getValue()}</span>` },
+    { title: 'Cost (৳)', field: 'costPrice', width: 110,
+      hozAlign: 'right', formatter: moneyFormatter },
+    { title: 'Sale (৳)', field: 'salePrice', width: 110,
+      hozAlign: 'right', formatter: moneyFormatter },
+    { title: 'Status',   field: 'status',    width: 110, formatter: badgeFormatter },
+    { title: '',         field: 'hash',      width: isAdmin ? 160 : 90,
+      hozAlign: 'right', headerSort: false,
+      formatter: cell => {
+        const h = cell.getValue();
+        let b = `<a href="/Product/Edit/${h}" class="btn btn-ghost btn-sm">Edit</a>`;
+        if (isAdmin) b += ` <button onclick="delProd('${h}')" class="btn btn-ghost btn-sm btn-danger">Del</button>`;
+        return `<div class="row" style="justify-content:flex-end">${b}</div>`;
+      }
+    }
+  ]
+});
+
+table.on('dataProcessed', () => {
+  document.getElementById('rowCount').textContent = table.getDataCount('active') + ' rows';
+});
+
+let deb;
+document.getElementById('search').addEventListener('input', e => {
+  clearTimeout(deb); deb = setTimeout(() => { filters.search = e.target.value; table.setPage(1); }, 350);
+});
+$('#filterCat').on('change', e => { filters.category = e.target.value || ''; table.setPage(1); });
+document.getElementById('filterStatus').addEventListener('change', e => {
+  filters.status = e.target.value; table.setPage(1);
+});
+
+async function delProd(hash) {
+  if (!confirm('Delete this product?')) return;
+  const d = await apiPost('/Product/Delete/' + hash);
+  if (d.success) { toastr.success('Product deleted.'); table.replaceData(); }
+  else toastr.error(d.message || 'Delete failed.');
+}
+</script>
+}

@@ -22,7 +22,7 @@ namespace InventoryBase.Infrastructure.Data
         public DbSet<Employee> Employees => Set<Employee>();
         public DbSet<ExpenseTemplate> ExpenseTemplates => Set<ExpenseTemplate>();
         public DbSet<Expense> Expenses => Set<Expense>();
-
+        public DbSet<Unit> Units => Set<Unit>();
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
@@ -47,6 +47,13 @@ namespace InventoryBase.Infrastructure.Data
                 e.Property(p => p.CostPrice).HasPrecision(18, 2);
                 e.Property(p => p.SalePrice).HasPrecision(18, 2);
             });
+
+            builder.Entity<Purchase>()
+                .Property(p => p.TotalAmount).HasPrecision(18, 2);
+
+            builder.Entity<Sale>()
+                .Property(s => s.TotalAmount).HasPrecision(18, 2);
+
             builder.Entity<Employee>()
                 .Property(e => e.Salary).HasPrecision(18, 2);
             builder.Entity<ExpenseTemplate>()

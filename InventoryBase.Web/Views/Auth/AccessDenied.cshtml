@@ -1,0 +1,9 @@
+@{ ViewData["Title"] = "Access Denied"; }
+<div class="content" style="display:grid;place-items:center;min-height:60vh">
+  <div style="text-align:center">
+    <div style="font-size:48px;font-weight:700;color:var(--border-2)">403</div>
+    <div style="font-size:18px;font-weight:600;margin:8px 0 6px">Access denied</div>
+    <div class="muted" style="margin-bottom:20px">You don't have permission to view this page.</div>
+    <a class="btn btn-primary" href="@Url.Action("Index","Dashboard")">Go to dashboard</a>
+  </div>
+</div>

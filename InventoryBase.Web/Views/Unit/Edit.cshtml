@@ -1,0 +1,32 @@
+@model InventoryBase.Core.Entities.Unit
+@{ ViewData["Title"] = "Edit unit"; ViewData["NavId"] = "units"; var hashId = (string)ViewBag.HashId; }
+<div class="content">
+  <div class="page-head">
+    <div><h1 class="page-title">Edit unit</h1><div class="page-sub">Update name or status.</div></div>
+    <div class="page-actions"><a class="btn" href="@Url.Action("Index","Unit")">Cancel</a></div>
+  </div>
+  <div style="max-width:480px">
+    <div class="card">
+      <div class="card-head"><div class="card-title">Unit details</div></div>
+      <div class="card-body">
+        <form method="post" asp-controller="Unit" asp-action="Edit" asp-route-id="@hashId">
+          @Html.AntiForgeryToken()
+          <div class="field">
+            <label class="label">Unit name <span class="req">*</span></label>
+            <input class="input" asp-for="Name" autofocus/>
+            <span asp-validation-for="Name" class="hint" style="color:var(--danger)"></span>
+          </div>
+          <div class="field" style="margin-top:4px">
+            <label class="row" style="gap:8px;cursor:pointer">
+              <input asp-for="IsActive" type="checkbox"/> <span>Active</span>
+            </label>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:16px">
+            <button type="submit" class="btn btn-primary">Save changes</button>
+            <a class="btn" href="@Url.Action("Index","Unit")">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

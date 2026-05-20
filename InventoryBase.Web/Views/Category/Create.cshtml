@@ -1,0 +1,48 @@
+@model InventoryBase.Core.Entities.Category
+@{
+    ViewData["Title"] = "New category"; ViewData["NavId"] = "categories";
+    var parents = (IEnumerable<InventoryBase.Core.Entities.Category>)ViewBag.Parents;
+}
+<div class="content">
+  <div class="page-head">
+    <div><h1 class="page-title">New category</h1><div class="page-sub">Fields marked <span style="color:var(--danger)">*</span> required.</div></div>
+    <div class="page-actions"><a class="btn" href="@Url.Action("Index","Category")">Cancel</a></div>
+  </div>
+  <div style="max-width:520px">
+    <div class="card">
+      <div class="card-head"><div class="card-title">Category details</div></div>
+      <div class="card-body">
+        <form method="post" asp-controller="Category" asp-action="Create">
+          @Html.AntiForgeryToken()
+          <div class="form-grid">
+            <div class="field span-2">
+              <label class="label">Category name <span class="req">*</span></label>
+              <input class="input" asp-for="Name" placeholder="e.g. Carpets &amp; Rugs" autofocus/>
+              <span asp-validation-for="Name" class="hint" style="color:var(--danger)"></span>
+            </div>
+            <div class="field span-2">
+              <label class="label">Parent category</label>
+              <select class="select select2-parent" asp-for="ParentCategoryId">
+                <option value="">— None (top level) —</option>
+                @foreach (var p in parents) { <option value="@p.Id">@p.Name</option> }
+              </select>
+              <div class="hint">Leave blank to create a top-level category.</div>
+            </div>
+            <div class="field span-2" style="margin-top:4px">
+              <label class="row" style="gap:8px;cursor:pointer">
+                <input asp-for="IsActive" type="checkbox" checked/> <span>Active</span>
+              </label>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:16px">
+            <button type="submit" class="btn btn-primary">Save category</button>
+            <a class="btn" href="@Url.Action("Index","Category")">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+@section Scripts {
+<script>$('.select2-parent').select2({ placeholder: '— None (top level) —', allowClear: true, width: '100%' });</script>
+}

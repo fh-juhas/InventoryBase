@@ -22,6 +22,7 @@ namespace InventoryBase.Core.Interfaces.Repositories
         IRepository<Employee> Employees { get; }
         IRepository<ExpenseTemplate> ExpenseTemplates { get; }
         IRepository<Expense> Expenses { get; }
+        IRepository<Unit> Units { get; }
 
         Task<int> SaveChangesAsync();
     }

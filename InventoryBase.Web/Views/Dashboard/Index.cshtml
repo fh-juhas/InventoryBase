@@ -1,0 +1,207 @@
+@{
+    ViewData["Title"]    = "Dashboard";
+    ViewData["SubTitle"] = $"Today — {DateTime.Now:dd MMM yyyy}";
+    ViewData["NavId"]    = "dashboard";
+}
+@section Styles {
+<style>
+.dash-grid{display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:12px}
+.activity-row{display:flex;justify-content:space-between;align-items:center;
+  padding:9px 0;border-bottom:1px solid var(--border);font-size:13px;gap:8px}
+.activity-row:last-child{border-bottom:none}
+.skeleton{background:linear-gradient(90deg,var(--surface-2) 25%,#ececea 50%,var(--surface-2) 75%);
+  background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:4px}
+@@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+@@media(max-width:1200px){.dash-grid{grid-template-columns:1fr}}
+</style>
+}
+<div class="content">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title" id="greet">Dashboard</h1>
+      <div class="page-sub">A quick look at how the gallery is moving today.</div>
+    </div>
+    <div class="page-actions">
+      <a class="btn btn-primary" href="@Url.Action("Create","Sale")">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New sale
+      </a>
+    </div>
+  </div>
+
+  <!-- Stat cards -->
+  <div class="stat-grid" id="statGrid">
+    @for (int i = 0; i < 4; i++) {
+    <div class="stat"><div class="stat-label skeleton" style="height:12px;width:80px;margin-bottom:10px"></div><div class="skeleton" style="height:28px;width:120px"></div></div>
+    }
+  </div>
+
+  <div class="dash-grid">
+    <!-- Sales vs Purchases chart -->
+    <div class="card">
+      <div class="card-head">
+        <div><div class="card-title">Sales &amp; Purchases</div><div class="xs muted">Last 30 days</div></div>
+        <div style="display:flex;gap:14px">
+          <span class="xs muted" style="display:flex;align-items:center;gap:5px"><span style="width:8px;height:8px;background:#1c1917;border-radius:2px;display:inline-block"></span>Sales</span>
+          <span class="xs muted" style="display:flex;align-items:center;gap:5px"><span style="width:8px;height:8px;background:oklch(.55 .10 55);border-radius:2px;display:inline-block"></span>Purchases</span>
+        </div>
+      </div>
+      <div class="card-body" style="padding:16px">
+        <canvas id="salesChart" style="max-height:220px"></canvas>
+      </div>
+    </div>
+
+    <!-- Low stock -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">Low stock alerts</div>
+        <a class="xs" style="color:var(--accent)" href="@Url.Action("Index","Stock")">View all</a>
+      </div>
+      <div id="lowStockBody" style="padding:6px 16px 12px">
+        <div class="skeleton" style="height:36px;margin:6px 0"></div>
+        <div class="skeleton" style="height:36px;margin:6px 0"></div>
+        <div class="skeleton" style="height:36px;margin:6px 0"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dash-grid">
+    <!-- Recent sales -->
+    <div class="card">
+      <div class="card-head"><div class="card-title">Recent sales</div></div>
+      <div id="recentSalesBody" style="padding:6px 16px 12px">
+        <div class="skeleton" style="height:36px;margin:6px 0"></div>
+        <div class="skeleton" style="height:36px;margin:6px 0"></div>
+      </div>
+    </div>
+
+    <!-- Summary mini stats -->
+    <div class="card">
+      <div class="card-head"><div class="card-title">At a glance</div></div>
+      <div class="card-body" id="glanceBody">
+        <div class="skeleton" style="height:16px;margin:8px 0"></div>
+        <div class="skeleton" style="height:16px;margin:8px 0;width:70%"></div>
+        <div class="skeleton" style="height:16px;margin:8px 0;width:85%"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+@section Scripts {
+<script>
+(async function(){
+  // greeting
+  const h = new Date().getHours();
+  const g = h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening';
+  document.getElementById('greet').textContent = `Good ${g}`;
+
+  // fetch all in parallel
+  const [stats, chart, lowStock, recent] = await Promise.all([
+    fetch('/Dashboard/Stats').then(r=>r.json()),
+    fetch('/Dashboard/ChartData').then(r=>r.json()),
+    fetch('/Dashboard/LowStock').then(r=>r.json()),
+    fetch('/Dashboard/RecentSales').then(r=>r.json())
+  ]);
+
+  // ── Stat cards ────────────────────────────────────────────────────────
+  const fmt = v => '৳ ' + parseFloat(v).toLocaleString('en-BD', {minimumFractionDigits:0});
+  document.getElementById('statGrid').innerHTML = `
+    <div class="stat"><div class="stat-label">Today's sales</div><div class="stat-value">${fmt(stats.todaySales)}</div><div class="stat-sub">— today</div></div>
+    <div class="stat"><div class="stat-label">Month sales</div><div class="stat-value">${fmt(stats.monthSales)}</div><div class="stat-sub">— this month</div></div>
+    <div class="stat"><div class="stat-label">Month purchases</div><div class="stat-value">${fmt(stats.monthPurchases)}</div><div class="stat-sub">— this month</div></div>
+    <div class="stat"><div class="stat-label">Stock value</div><div class="stat-value">${fmt(stats.stockValue)}</div><div class="stat-sub">${stats.activeProducts} active SKUs · ${stats.lowStockCount} low</div></div>
+  `;
+
+  // ── Chart.js ──────────────────────────────────────────────────────────
+  const ctx = document.getElementById('salesChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: chart.labels,
+      datasets: [
+        {
+          label: 'Sales',
+          data: chart.sales,
+          backgroundColor: '#1c1917',
+          borderRadius: 3,
+          barPercentage: 0.6
+        },
+        {
+          label: 'Purchases',
+          data: chart.purchases,
+          backgroundColor: 'oklch(55% 0.10 55)',
+          borderRadius: 3,
+          barPercentage: 0.6
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => ' ৳ ' + parseFloat(ctx.raw).toLocaleString('en-BD', {minimumFractionDigits:0})
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { font: { size: 11 }, color: '#a8a29e',
+            maxTicksLimit: 10 }
+        },
+        y: {
+          grid: { color: '#e7e5e4' },
+          ticks: {
+            font: { size: 11 }, color: '#a8a29e',
+            callback: v => '৳' + (v >= 1000 ? (v/1000).toFixed(0)+'k' : v)
+          }
+        }
+      }
+    }
+  });
+
+  // ── Low stock ─────────────────────────────────────────────────────────
+  if (!lowStock.length) {
+    document.getElementById('lowStockBody').innerHTML =
+      '<div style="color:var(--muted);font-size:13px;padding:10px 0">No low-stock items 🎉</div>';
+  } else {
+    document.getElementById('lowStockBody').innerHTML = lowStock.map(s => {
+      const cls = s.qty <= 3 ? 'danger' : 'warning';
+      const lbl = s.qty <= 3 ? 'critical' : 'low';
+      return `<div class="activity-row">
+        <div><span class="bold">${s.name}</span> <span class="muted mono xs">${s.sku}</span></div>
+        <div style="text-align:right">
+          <span class="badge dot ${cls}">${lbl}</span>
+          <div class="xs muted">${parseFloat(s.qty).toLocaleString()} ${s.unit}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // ── Recent sales ──────────────────────────────────────────────────────
+  if (!recent.length) {
+    document.getElementById('recentSalesBody').innerHTML =
+      '<div style="color:var(--muted);font-size:13px;padding:10px 0">No sales yet.</div>';
+  } else {
+    document.getElementById('recentSalesBody').innerHTML = recent.map(s =>
+      `<div class="activity-row">
+        <div><span class="mono bold">${s.invoice}</span> <span class="muted">· ${s.customer}</span></div>
+        <div style="text-align:right"><div class="mono bold">৳ ${parseFloat(s.amount).toLocaleString('en-BD',{minimumFractionDigits:0})}</div><div class="xs muted">${s.date}</div></div>
+      </div>`
+    ).join('');
+  }
+
+  // ── At a glance ───────────────────────────────────────────────────────
+  document.getElementById('glanceBody').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px">
+      <div><div class="xs muted">Active products</div><div class="bold">${stats.activeProducts}</div></div>
+      <div><div class="xs muted">Low stock items</div><div class="bold" style="color:var(--warning)">${stats.lowStockCount}</div></div>
+      <div><div class="xs muted">Month revenue</div><div class="bold">${fmt(stats.monthSales)}</div></div>
+      <div><div class="xs muted">Month spent</div><div class="bold">${fmt(stats.monthPurchases)}</div></div>
+    </div>`;
+})();
+</script>
+}

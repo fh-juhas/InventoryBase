@@ -29,6 +29,7 @@ namespace InventoryBase.Infrastructure.Repositories
             Employees = new Repository<Employee>(ctx);
             ExpenseTemplates = new Repository<ExpenseTemplate>(ctx);
             Expenses = new Repository<Expense>(ctx);
+            Units = new Repository<Unit>(ctx);
         }
 
         public IRepository<CompanySettings> CompanySettings { get; }
@@ -44,6 +45,7 @@ namespace InventoryBase.Infrastructure.Repositories
         public IRepository<Employee> Employees { get; }
         public IRepository<ExpenseTemplate> ExpenseTemplates { get; }
         public IRepository<Expense> Expenses { get; }
+        public IRepository<Unit> Units { get; }
 
         public async Task<int> SaveChangesAsync() => await _ctx.SaveChangesAsync();
         public void Dispose() => _ctx.Dispose();

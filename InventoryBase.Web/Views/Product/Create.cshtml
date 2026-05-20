@@ -1,0 +1,94 @@
+@model InventoryBase.Core.Entities.Product
+@{
+    ViewData["Title"] = "New product"; ViewData["NavId"] = "products";
+    var categories = (IEnumerable<InventoryBase.Core.Entities.Category>)ViewBag.Categories;
+    var units      = (IEnumerable<InventoryBase.Core.Entities.Unit>)ViewBag.Units;
+}
+<div class="content">
+  <div class="page-head">
+    <div><h1 class="page-title">New product</h1><div class="page-sub">Fields marked <span style="color:var(--danger)">*</span> required.</div></div>
+    <div class="page-actions"><a class="btn" href="@Url.Action("Index","Product")">Cancel</a></div>
+  </div>
+  <form method="post" asp-controller="Product" asp-action="Create">
+    @Html.AntiForgeryToken()
+    <div class="split">
+      <div class="col gap-16">
+        <div class="card">
+          <div class="card-head"><div class="card-title">Basic information</div></div>
+          <div class="card-body">
+            <div class="form-grid">
+              <div class="field span-2">
+                <label class="label">Product name <span class="req">*</span></label>
+                <input class="input" asp-for="Name" placeholder="e.g. Persian Runner 2.5m" autofocus/>
+                <span asp-validation-for="Name" class="hint" style="color:var(--danger)"></span>
+              </div>
+              <div class="field">
+                <label class="label">SKU <span class="req">*</span></label>
+                <input class="input mono" asp-for="SKU" placeholder="e.g. P-1001"/>
+                <div class="hint">Must be unique.</div>
+                <span asp-validation-for="SKU" class="hint" style="color:var(--danger)"></span>
+              </div>
+              <div class="field">
+                <label class="label">Unit <span class="req">*</span></label>
+                <select class="select s2-unit" asp-for="UnitID">
+                  <option value="">— Select unit —</option>
+                  @foreach (var u in units) { <option value="@u.Id">@u.Name</option> }
+                </select>
+                <span asp-validation-for="UnitID" class="hint" style="color:var(--danger)"></span>
+              </div>
+              <div class="field span-2">
+                <label class="label">Category <span class="req">*</span></label>
+                <select class="select s2-cat" asp-for="CategoryId">
+                  <option value="">— Select category —</option>
+                  @foreach (var c in categories) { <option value="@c.Id">@c.Name</option> }
+                </select>
+                <span asp-validation-for="CategoryId" class="hint" style="color:var(--danger)"></span>
+              </div>
+              <div class="field span-2">
+                <label class="label">Description</label>
+                <textarea class="textarea" asp-for="Description" placeholder="Short description shown on invoices."></textarea>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div class="card-title">Pricing</div></div>
+          <div class="card-body">
+            <div class="form-grid">
+              <div class="field">
+                <label class="label">Cost price (৳) <span class="req">*</span></label>
+                <input class="input mono" asp-for="CostPrice" placeholder="0.00"/>
+                <span asp-validation-for="CostPrice" class="hint" style="color:var(--danger)"></span>
+              </div>
+              <div class="field">
+                <label class="label">Sale price (৳) <span class="req">*</span></label>
+                <input class="input mono" asp-for="SalePrice" placeholder="0.00"/>
+                <span asp-validation-for="SalePrice" class="hint" style="color:var(--danger)"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col gap-12">
+        <div class="card">
+          <div class="card-head"><div class="card-title">Status</div></div>
+          <div class="card-body">
+            <label class="row" style="gap:8px;cursor:pointer">
+              <input asp-for="IsActive" type="checkbox" checked/> <span>Active</span>
+            </label>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button type="submit" class="btn btn-primary">Save product</button>
+          <a class="btn" href="@Url.Action("Index","Product")">Cancel</a>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+@section Scripts {
+<script>
+$('.s2-cat').select2({ placeholder: '— Select category —', allowClear: true, width: '100%' });
+$('.s2-unit').select2({ placeholder: '— Select unit —', allowClear: true, width: '100%' });
+</script>
+}

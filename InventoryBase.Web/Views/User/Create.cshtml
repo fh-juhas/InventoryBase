@@ -1,0 +1,47 @@
+@model InventoryBase.Web.ViewModels.CreateUserViewModel
+@{ ViewData["Title"] = "Invite user"; ViewData["NavId"] = "users"; }
+<div class="content">
+  <div class="page-head">
+    <div><h1 class="page-title">Invite user</h1><div class="page-sub">Create a new user account and assign a role.</div></div>
+    <div class="page-actions"><a class="btn" href="@Url.Action("Index","User")">Cancel</a></div>
+  </div>
+  <div style="max-width:480px">
+    <div class="card">
+      <div class="card-head"><div class="card-title">Account details</div></div>
+      <div class="card-body">
+        <form method="post" asp-controller="User" asp-action="Create">
+          @Html.AntiForgeryToken()
+          <div class="field">
+            <label class="label">Full name <span class="req">*</span></label>
+            <input class="input" asp-for="FullName" placeholder="e.g. Nasrin Akter" autofocus/>
+            <span asp-validation-for="FullName" class="hint" style="color:var(--danger)"></span>
+          </div>
+          <div class="field">
+            <label class="label">Email <span class="req">*</span></label>
+            <input class="input" asp-for="Email" type="email" placeholder="name@company.com"/>
+            <span asp-validation-for="Email" class="hint" style="color:var(--danger)"></span>
+          </div>
+          <div class="field">
+            <label class="label">Password <span class="req">*</span></label>
+            <input class="input" asp-for="Password" type="password" placeholder="Min. 6 characters"/>
+            <span asp-validation-for="Password" class="hint" style="color:var(--danger)"></span>
+          </div>
+          <div class="field">
+            <label class="label">Role <span class="req">*</span></label>
+            <select class="select s2-role" asp-for="Role">
+              <option value="User">User</option>
+              <option value="Admin">Admin</option>
+            </select>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:16px">
+            <button type="submit" class="btn btn-primary">Create user</button>
+            <a class="btn" href="@Url.Action("Index","User")">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+@section Scripts {
+<script>$('.s2-role').select2({ minimumResultsForSearch: Infinity, width: '100%' });</script>
+}
