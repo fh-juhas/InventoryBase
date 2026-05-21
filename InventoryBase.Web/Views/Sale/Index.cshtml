@@ -1,0 +1,34 @@
+@{ ViewData["Title"] = "Sales"; ViewData["NavId"] = "sales"; }
+<div class="content">
+  <div class="page-head">
+    <div><h1 class="page-title">Sales</h1><div class="page-sub">Sales invoices and revenue history.</div></div>
+    <div class="page-actions"><a class="btn btn-primary" href="@Url.Action("Create","Sale")">+ New sale</a></div>
+  </div>
+  <div class="table-wrap">
+    <div class="table-toolbar">
+      <div class="search-box"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input id="search" placeholder="Search invoice or customer…"/></div>
+      <div class="spacer"></div><span class="xs muted" id="rowCount"></span>
+    </div>
+    <div id="saleTable"></div>
+  </div>
+</div>
+@section Scripts {
+<script>
+let filters = { search: '' };
+const table = new Tabulator('#saleTable', {
+  ...window.tabulatorDefaults, ajaxURL: '/Sale/Data', ajaxParams: () => ({ ...filters }),
+  columns: [
+    { title: 'Invoice',  field: 'invoiceNo',   width: 130, formatter: c => `<span class="mono bold">${c.getValue()}</span>` },
+    { title: 'Customer', field: 'customer',    widthGrow: 2 },
+    { title: 'Date',     field: 'saleDate',    width: 130, formatter: c => `<span class="muted">${c.getValue()}</span>` },
+    { title: 'Total (৳)',field: 'totalAmount', width: 130, hozAlign: 'right', formatter: moneyFormatter },
+    { title: 'Note',     field: 'note',        widthGrow: 2, formatter: c => `<span class="muted">${c.getValue()}</span>` },
+    { title: '', field: 'hash', width: 90, hozAlign: 'right', headerSort: false,
+      formatter: cell => `<a href="/Sale/Details/${cell.getValue()}" class="btn btn-ghost btn-sm">View</a>`
+    }
+  ]
+});
+table.on('dataProcessed', () => { document.getElementById('rowCount').textContent = table.getDataCount('active') + ' rows'; });
+let deb; document.getElementById('search').addEventListener('input', e => { clearTimeout(deb); deb = setTimeout(() => { filters.search = e.target.value; table.setPage(1); }, 350); });
+</script>
+}

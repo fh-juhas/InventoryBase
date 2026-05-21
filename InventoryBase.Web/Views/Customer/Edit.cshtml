@@ -1,0 +1,18 @@
+@model InventoryBase.Core.Entities.Customer
+@{ ViewData["Title"] = "Edit customer"; ViewData["NavId"] = "customers"; var hashId = (string)ViewBag.HashId; }
+<div class="content">
+  <div class="page-head"><div><h1 class="page-title">Edit customer</h1><div class="page-sub">@Model.Name</div></div><div class="page-actions"><a class="btn" href="@Url.Action("Index","Customer")">Cancel</a></div></div>
+  <div style="max-width:580px"><div class="card"><div class="card-head"><div class="card-title">Customer details</div></div><div class="card-body">
+    <form method="post" asp-controller="Customer" asp-action="Edit" asp-route-id="@hashId">
+      @Html.AntiForgeryToken()
+      <div class="form-grid">
+        <div class="field span-2"><label class="label">Name <span class="req">*</span></label><input class="input" asp-for="Name"/></div>
+        <div class="field"><label class="label">Phone</label><input class="input mono" asp-for="Phone"/></div>
+        <div class="field"><label class="label">Email</label><input class="input" asp-for="Email" type="email"/></div>
+        <div class="field"><label class="row" style="gap:8px;cursor:pointer"><input asp-for="IsActive" type="checkbox"/> Active</label></div>
+        <div class="field span-2"><label class="label">Address</label><textarea class="textarea" asp-for="Address"></textarea></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:16px"><button type="submit" class="btn btn-primary">Save changes</button><a class="btn" href="@Url.Action("Index","Customer")">Cancel</a></div>
+    </form>
+  </div></div></div>
+</div>

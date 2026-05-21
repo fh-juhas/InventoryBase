@@ -29,7 +29,6 @@ public class UserController : Controller
         if (req.status == "active")   all = all.Where(u => u.IsActive).ToList();
         if (req.status == "inactive") all = all.Where(u => !u.IsActive).ToList();
 
-        // resolve roles
         var vms = new List<object>();
         foreach (var u in all)
         {
@@ -39,23 +38,23 @@ public class UserController : Controller
                 !role.Equals(req.role, StringComparison.OrdinalIgnoreCase)) continue;
             vms.Add(new
             {
-                hash     = _hash.Encode(u.RowId),
-                fullName = u.FullName,
-                email    = u.Email ?? "",
-                role     = role,
-                status   = u.IsActive ? "active" : "inactive",
-                isActive = u.IsActive
+                hash       = _hash.Encode(u.RowId),
+                identityId = u.Id,               // ← GUID for reset password route
+                fullName   = u.FullName,
+                email      = u.Email ?? "",
+                role       = role,
+                status     = u.IsActive ? "active" : "inactive",
+                isActive   = u.IsActive
             });
         }
 
         int total    = vms.Count;
-        int lastPage = (int)Math.Ceiling(total / (double)req.size);
+        int lastPage = (int)Math.Ceiling(total / (double)(req.size > 0 ? req.size : 20));
         var page     = vms.Skip((req.page - 1) * req.size).Take(req.size).ToList<object>();
 
         return Json(new TabulatorResponse<object> { last_page = Math.Max(lastPage, 1), data = page });
     }
 
-    // Role summary counts
     [HttpGet]
     public async Task<IActionResult> RoleCounts()
     {
@@ -70,14 +69,14 @@ public class UserController : Controller
         return Json(new { admins, users, total = all.Count });
     }
 
-    [HttpGet]  public IActionResult Create() => View();
+    [HttpGet] public IActionResult Create() => View();
 
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(CreateUserViewModel model)
     {
         if (!ModelState.IsValid) return View(model);
         var ok = await _users.CreateAsync(model.FullName, model.Email, model.Password, model.Role);
-        if (!ok) { ModelState.AddModelError("", "Failed to create user."); return View(model); }
+        if (!ok) { ModelState.AddModelError("", "Failed to create user. Email may already exist."); return View(model); }
         TempData["Success"] = "User created.";
         return RedirectToAction(nameof(Index));
     }
@@ -86,7 +85,7 @@ public class UserController : Controller
     public async Task<IActionResult> Deactivate(string id)
     {
         var rowId = _hash.Decode(id);
-        if (rowId == null) return BadRequest();
+        if (rowId == null) return Json(new { success = false, message = "Invalid id." });
         await _users.DeactivateAsync(rowId.Value);
         return Json(new { success = true });
     }

@@ -1,32 +1,31 @@
 @{
     ViewData["Title"] = "Expenses"; ViewData["NavId"] = "expenses";
-    int  month = (int?)ViewBag.Month ?? DateTime.Now.Month;
-    int  year  = (int?)ViewBag.Year  ?? DateTime.Now.Year;
-    var months = System.Globalization.CultureInfo.InvariantCulture.DateTimeFormat.MonthNames.Take(12).ToArray();
-    var isAdmin = User.IsInRole("Admin");
+    int  month   = (int?)ViewBag.Month ?? DateTime.Now.Month;
+    int  year    = (int?)ViewBag.Year  ?? DateTime.Now.Year;
+    var  months  = System.Globalization.CultureInfo.InvariantCulture.DateTimeFormat.MonthNames.Take(12).ToArray();
+    var  isAdmin = User.IsInRole("Admin");
 }
 <div class="content">
   <div class="page-head">
     <div>
       <h1 class="page-title">Expenses</h1>
-      <div class="page-sub">Monthly expense tracking — <span id="periodLabel">@months[month-1] @year</span></div>
+      <div class="page-sub">Monthly tracking — <strong>@months[month-1] @year</strong></div>
     </div>
     <div class="page-actions">
-      <!-- Period picker -->
-      <form id="periodForm" method="get" asp-controller="Expense" asp-action="Index" style="display:flex;gap:8px">
-        <select class="select s2-month" name="month" id="monthPick" style="width:130px">
+      <!-- Period picker (GET form — not apiPost) -->
+      <form method="get" asp-controller="Expense" asp-action="Index" style="display:flex;gap:8px">
+        <select class="select s2-month" name="month" style="width:130px">
           @for (int m = 1; m <= 12; m++) {
             <option value="@m" selected="@(m==month)">@months[m-1]</option>
           }
         </select>
-        <select class="select s2-year" name="year" id="yearPick" style="width:90px">
+        <select class="select s2-year" name="year" style="width:90px">
           @for (int y = DateTime.Now.Year; y >= DateTime.Now.Year - 3; y--) {
             <option value="@y" selected="@(y==year)">@y</option>
           }
         </select>
         <button type="submit" class="btn">Go</button>
       </form>
-
       <button id="btnGenerate" class="btn" style="display:none">Generate from templates</button>
       <button id="btnConfirm"  class="btn btn-primary" style="display:none">Confirm &amp; lock</button>
     </div>
@@ -44,7 +43,7 @@
         <option value="confirmed">Confirmed</option>
       </select>
       <div class="spacer"></div>
-      <div class="bold" style="font-size:13px">Total: <span id="totalAmount" class="mono">৳ 0</span></div>
+      <div class="bold" style="font-size:13px">Total: <span id="totalAmount" class="mono">৳ 0.00</span></div>
     </div>
     <div id="expTable"></div>
   </div>
@@ -58,41 +57,41 @@
 
 @section Scripts {
 <script>
-const MONTH = @month;
-const YEAR  = @year;
-const isAdmin = @isAdmin.ToString().ToLower();
-let filters = { month: MONTH, year: YEAR, search: '', status: '' };
+const MONTH   = @month;
+const YEAR    = @year;
+let filters   = { month: MONTH, year: YEAR, search: '', status: '' };
 
-// Load summary (hasDraft, total) and show/hide action buttons
+// ── Load summary ─────────────────────────────────────────────────────
 async function loadSummary() {
-  const s = await fetch(`/Expense/MonthSummary?month=${MONTH}&year=${YEAR}`).then(r => r.json());
-  document.getElementById('totalAmount').textContent =
-    '৳ ' + parseFloat(s.total).toLocaleString('en-BD', { minimumFractionDigits: 2 });
-  document.getElementById('btnGenerate').style.display = (!s.hasDraft) ? '' : 'none';
-  document.getElementById('btnConfirm').style.display  = (s.hasDraft)  ? '' : 'none';
+  try {
+    const s = await fetch(`/Expense/MonthSummary?month=${MONTH}&year=${YEAR}`).then(r => r.json());
+    document.getElementById('totalAmount').textContent =
+      '৳ ' + parseFloat(s.total || 0).toLocaleString('en-BD', { minimumFractionDigits: 2 });
+    document.getElementById('btnGenerate').style.display = s.hasDraft ? 'none' : '';
+    document.getElementById('btnConfirm').style.display  = s.hasDraft ? ''     : 'none';
+  } catch(e) { console.error('loadSummary failed', e); }
 }
 loadSummary();
 
+// ── Tabulator ────────────────────────────────────────────────────────
 const table = new Tabulator('#expTable', {
+  ...window.tabulatorDefaults,
   ajaxURL: '/Expense/Data',
   ajaxParams: () => ({ ...filters }),
-  ajaxResponse: (url, params, resp) => resp,
-  pagination: true, paginationMode: 'remote',
-  paginationSize: 20, paginationSizeSelector: [10, 20, 50],
-  sortMode: 'remote', layout: 'fitColumns',
-  placeholder: 'No expenses yet. Click "Generate from templates" to create them.',
   columns: [
     { title: 'Category',    field: 'category',    widthGrow: 2,
       formatter: c => `<span class="bold">${c.getValue()}</span>` },
     { title: 'Description', field: 'description', widthGrow: 2,
       formatter: c => `<span class="muted">${c.getValue()}</span>` },
-    { title: 'Amount (৳)',  field: 'amount',       width: 160,
+    { title: 'Amount (৳)',  field: 'amount',       width: 180,
       hozAlign: 'right',
       formatter: (cell) => {
         const row = cell.getRow().getData();
         if (row.isDraft) {
-          return `<input type="number" class="input mono" style="width:130px;text-align:right;padding:4px 8px"
-            value="${parseFloat(cell.getValue()).toFixed(2)}" step="0.01"
+          return `<input type="number" class="input mono"
+            style="width:140px;text-align:right;padding:4px 8px;height:30px"
+            value="${parseFloat(cell.getValue()).toFixed(2)}"
+            step="0.01"
             data-hash="${row.hash}"
             onchange="updateAmount(this)"
             onclick="event.stopPropagation()"/>`;
@@ -100,10 +99,11 @@ const table = new Tabulator('#expTable', {
         return moneyFormatter(cell);
       }
     },
-    { title: 'Status', field: 'status', width: 120, formatter: badgeFormatter }
+    { title: 'Status', field: 'status', width: 130, formatter: badgeFormatter }
   ]
 });
 
+// ── Filters ──────────────────────────────────────────────────────────
 let deb;
 document.getElementById('search').addEventListener('input', e => {
   clearTimeout(deb); deb = setTimeout(() => { filters.search = e.target.value; table.setPage(1); }, 350);
@@ -112,34 +112,65 @@ document.getElementById('filterStatus').addEventListener('change', e => {
   filters.status = e.target.value; table.setPage(1);
 });
 
-// Generate
+// ── Generate — FIX: was returning redirect, now returns JSON ─────────
 document.getElementById('btnGenerate').addEventListener('click', async () => {
-  const d = await apiPost('/Expense/Generate', { month: MONTH, year: YEAR });
-  toastr.success('Expenses generated.'); table.replaceData(); loadSummary();
+  const btn = document.getElementById('btnGenerate');
+  btn.disabled = true; btn.textContent = 'Generating…';
+  try {
+    const d = await apiPost('/Expense/Generate', { month: MONTH, year: YEAR });
+    if (d.success) {
+      toastr.success(d.message || 'Expenses generated.');
+      await table.replaceData();
+      await loadSummary();
+    } else {
+      toastr.error(d.message || 'Generation failed.');
+    }
+  } catch(e) {
+    toastr.error('Request failed. Check console.');
+    console.error(e);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Generate from templates';
+  }
 });
 
-// Confirm
+// ── Confirm — same fix ────────────────────────────────────────────────
 document.getElementById('btnConfirm').addEventListener('click', async () => {
-  if (!confirm(`Lock all expenses for ${MONTH}/${YEAR}? This cannot be undone.`)) return;
-  await apiPost('/Expense/Confirm', { month: MONTH, year: YEAR });
-  toastr.success('Expenses confirmed and locked.'); table.replaceData(); loadSummary();
+  if (!confirm(`Lock all expenses for ${MONTH}/${YEAR}?\nThis cannot be undone.`)) return;
+  const btn = document.getElementById('btnConfirm');
+  btn.disabled = true; btn.textContent = 'Locking…';
+  try {
+    const d = await apiPost('/Expense/Confirm', { month: MONTH, year: YEAR });
+    if (d.success) {
+      toastr.success(d.message || 'Expenses confirmed.');
+      await table.replaceData();
+      await loadSummary();
+    } else {
+      toastr.error(d.message || 'Failed.');
+    }
+  } catch(e) {
+    toastr.error('Request failed.'); console.error(e);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Confirm & lock';
+  }
 });
 
-// Inline amount update
+// ── Inline amount update ──────────────────────────────────────────────
 async function updateAmount(el) {
   const val  = parseFloat(el.value);
   const hash = el.dataset.hash;
   if (isNaN(val) || val < 0) return;
-  const d = await apiPost('/Expense/UpdateAmount', { id: hash, amount: val });
-  if (d.success) {
-    el.style.borderColor = 'var(--success)';
-    setTimeout(() => el.style.borderColor = '', 1200);
-    loadSummary();
-  } else { toastr.error('Failed to update amount.'); }
+  try {
+    const d = await apiPost('/Expense/UpdateAmount', { id: hash, amount: val });
+    if (d.success) {
+      el.style.borderColor = 'var(--success)';
+      setTimeout(() => el.style.borderColor = '', 1200);
+      loadSummary();
+    } else { toastr.error('Failed to update amount.'); }
+  } catch(e) { toastr.error('Request failed.'); }
 }
 
-// Select2 on period pickers
-$('#monthPick').select2({ minimumResultsForSearch: Infinity, width: '130px' });
-$('#yearPick').select2({ minimumResultsForSearch: Infinity, width: '90px' });
+// ── Select2 on period pickers ─────────────────────────────────────────
+$('.s2-month').select2({ minimumResultsForSearch: Infinity, width: '130px' });
+$('.s2-year').select2({ minimumResultsForSearch: Infinity, width: '90px' });
 </script>
 }

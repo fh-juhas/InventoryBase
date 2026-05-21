@@ -1,0 +1,19 @@
+@model InventoryBase.Core.Entities.Supplier
+@{ ViewData["Title"] = "New supplier"; ViewData["NavId"] = "suppliers"; }
+<div class="content">
+  <div class="page-head"><div><h1 class="page-title">New supplier</h1></div><div class="page-actions"><a class="btn" href="@Url.Action("Index","Supplier")">Cancel</a></div></div>
+  <div style="max-width:580px"><div class="card"><div class="card-head"><div class="card-title">Supplier details</div></div><div class="card-body">
+    <form method="post" asp-controller="Supplier" asp-action="Create">
+      @Html.AntiForgeryToken()
+      <div class="form-grid">
+        <div class="field span-2"><label class="label">Company name <span class="req">*</span></label><input class="input" asp-for="Name" autofocus/><span asp-validation-for="Name" class="hint" style="color:var(--danger)"></span></div>
+        <div class="field"><label class="label">Contact person</label><input class="input" asp-for="ContactPerson"/></div>
+        <div class="field"><label class="label">Phone</label><input class="input mono" asp-for="Phone"/></div>
+        <div class="field"><label class="label">Email</label><input class="input" asp-for="Email" type="email"/></div>
+        <div class="field"></div>
+        <div class="field span-2"><label class="label">Address</label><textarea class="textarea" asp-for="Address"></textarea></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:16px"><button type="submit" class="btn btn-primary">Save supplier</button><a class="btn" href="@Url.Action("Index","Supplier")">Cancel</a></div>
+    </form>
+  </div></div></div>
+</div>

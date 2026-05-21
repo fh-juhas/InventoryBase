@@ -17,6 +17,6 @@ namespace InventoryBase.Core.Entities
         public string? Note { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.Now;
 
-        public Product Product { get; set; } = null!;
+        public Product? Product { get; set; } 
     }
 }

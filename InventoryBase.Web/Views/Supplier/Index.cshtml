@@ -1,0 +1,43 @@
+@{ ViewData["Title"] = "Suppliers"; ViewData["NavId"] = "suppliers"; var isAdmin = User.IsInRole("Admin"); }
+<div class="content">
+  <div class="page-head">
+    <div><h1 class="page-title">Suppliers</h1><div class="page-sub">Manage your supply partners.</div></div>
+    <div class="page-actions"><a class="btn btn-primary" href="@Url.Action("Create","Supplier")">+ New supplier</a></div>
+  </div>
+  <div class="table-wrap">
+    <div class="table-toolbar">
+      <div class="search-box"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input id="search" placeholder="Search name, phone, email…"/></div>
+      <select class="select" id="filterStatus" style="width:150px"><option value="">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option></select>
+      <div class="spacer"></div><span class="xs muted" id="rowCount"></span>
+    </div>
+    <div id="supTable"></div>
+  </div>
+</div>
+@section Scripts {
+<script>
+const isAdmin = @isAdmin.ToString().ToLower();
+let filters = { search: '', status: '' };
+const table = new Tabulator('#supTable', {
+  ...window.tabulatorDefaults, ajaxURL: '/Supplier/Data', ajaxParams: () => ({ ...filters }),
+  columns: [
+    { title: 'Name',    field: 'name',          widthGrow: 2, formatter: c => `<span class="bold">${c.getValue()}</span>` },
+    { title: 'Contact', field: 'contactPerson',  widthGrow: 1, formatter: c => `<span class="muted">${c.getValue()}</span>` },
+    { title: 'Phone',   field: 'phone',          width: 130,   formatter: c => `<span class="mono">${c.getValue()}</span>` },
+    { title: 'Email',   field: 'email',          widthGrow: 2, formatter: c => `<span class="muted">${c.getValue()}</span>` },
+    { title: 'Status',  field: 'status',         width: 110,   formatter: badgeFormatter },
+    { title: '', field: 'hash', width: isAdmin ? 170 : 90, hozAlign: 'right', headerSort: false,
+      formatter: cell => {
+        const h = cell.getValue();
+        let b = `<a href="/Supplier/Edit/${h}" class="btn btn-ghost btn-sm">Edit</a>`;
+        if (isAdmin) b += ` <button onclick="del('${h}')" class="btn btn-ghost btn-sm btn-danger">Delete</button>`;
+        return `<div class="row" style="justify-content:flex-end">${b}</div>`;
+      }
+    }
+  ]
+});
+table.on('dataProcessed', () => { document.getElementById('rowCount').textContent = table.getDataCount('active') + ' rows'; });
+let deb; document.getElementById('search').addEventListener('input', e => { clearTimeout(deb); deb = setTimeout(() => { filters.search = e.target.value; table.setPage(1); }, 350); });
+document.getElementById('filterStatus').addEventListener('change', e => { filters.status = e.target.value; table.setPage(1); });
+async function del(hash) { if (!confirm('Delete this supplier?')) return; const d = await apiPost('/Supplier/Delete/'+hash); if (d.success) { toastr.success('Deleted.'); table.replaceData(); } else toastr.error(d.message); }
+</script>
+}

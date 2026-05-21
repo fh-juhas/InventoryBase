@@ -1,0 +1,127 @@
+@{ ViewData["Title"] = "Reports"; ViewData["NavId"] = "reports"; }
+@section Styles {
+<style>
+.report-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:16px}
+.pl-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
+.pl-row:last-child{border-bottom:none}
+.pl-row.total{border-top:2px solid var(--border);font-weight:600;font-size:15px;padding-top:12px;margin-top:4px}
+@@media(max-width:1100px){.report-grid{grid-template-columns:1fr}}
+</style>
+}
+<div class="content">
+  <div class="page-head">
+    <div><h1 class="page-title">Reports</h1><div class="page-sub">Financial summaries and business insights.</div></div>
+    <div class="page-actions">
+      <select class="select s2-month" id="rMonth" style="width:130px">
+        @{ var months = System.Globalization.CultureInfo.InvariantCulture.DateTimeFormat.MonthNames.Take(12).ToArray(); }
+        @for (int m = 1; m <= 12; m++) {
+          <option value="@m" selected="@(m==DateTime.Now.Month)">@months[m-1]</option>
+        }
+      </select>
+      <select class="select s2-year" id="rYear" style="width:90px">
+        @for (int y = DateTime.Now.Year; y >= DateTime.Now.Year - 3; y--) {
+          <option value="@y" selected="@(y==DateTime.Now.Year)">@y</option>
+        }
+      </select>
+      <button class="btn btn-primary" onclick="loadReports()">Load</button>
+    </div>
+  </div>
+
+  <!-- P&L + Top Products -->
+  <div class="report-grid">
+    <div class="card">
+      <div class="card-head"><div class="card-title">Profit &amp; Loss</div><span class="xs muted" id="plPeriod"></span></div>
+      <div class="card-body" id="plBody">
+        <div style="color:var(--muted);font-size:13px">Click Load to generate the report.</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div class="card-title">Top selling products</div><span class="xs muted" id="topPeriod"></span></div>
+      <div class="card-body" style="padding:6px 16px 12px" id="topBody">
+        <div style="color:var(--muted);font-size:13px">Click Load to generate the report.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 12-month sales trend -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-head"><div class="card-title">Monthly sales trend</div><span class="xs muted">Last 12 months</span></div>
+    <div class="card-body"><canvas id="trendChart" style="max-height:240px"></canvas></div>
+  </div>
+</div>
+
+@section Scripts {
+<script>
+$('.s2-month').select2({ minimumResultsForSearch: Infinity, width: '130px' });
+$('.s2-year').select2({ minimumResultsForSearch: Infinity, width: '90px' });
+
+const fmt = v => '৳ ' + parseFloat(v||0).toLocaleString('en-BD', { minimumFractionDigits: 2 });
+
+async function loadReports() {
+  const month = document.getElementById('rMonth').value;
+  const year  = document.getElementById('rYear').value;
+  const period = `${document.getElementById('rMonth').options[month-1].text} ${year}`;
+
+  document.getElementById('plPeriod').textContent  = period;
+  document.getElementById('topPeriod').textContent = period;
+
+  // P&L
+  const pl = await fetch(`/Report/ProfitLoss?month=${month}&year=${year}`).then(r=>r.json());
+  document.getElementById('plBody').innerHTML = `
+    <div class="pl-row"><span class="muted">Revenue</span><span class="mono">${fmt(pl.revenue)}</span></div>
+    <div class="pl-row"><span class="muted">Cost of goods sold</span><span class="mono" style="color:var(--danger)">− ${fmt(pl.cogs)}</span></div>
+    <div class="pl-row"><span>Gross profit</span><span class="mono bold">${fmt(pl.grossProfit)}</span></div>
+    <div class="pl-row"><span class="muted">Confirmed expenses</span><span class="mono" style="color:var(--danger)">− ${fmt(pl.expenses)}</span></div>
+    <div class="pl-row total"><span>Net profit</span><span class="mono" style="color:${pl.netProfit>=0?'var(--success)':'var(--danger)'}">${fmt(pl.netProfit)}</span></div>
+  `;
+
+  // Top products
+  const tops = await fetch(`/Report/TopProducts?month=${month}&year=${year}`).then(r=>r.json());
+  if (!tops.length) {
+    document.getElementById('topBody').innerHTML = '<div class="muted xs">No sales this period.</div>';
+  } else {
+    document.getElementById('topBody').innerHTML = tops.map((p, i) => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="width:20px;height:20px;border-radius:50%;background:${i===0?'var(--text)':'var(--surface-2)'};color:${i===0?'var(--surface)':'var(--text-2)'};display:inline-grid;place-items:center;font-size:11px;font-weight:600">${i+1}</span>
+          <div><div class="bold">${p.name}</div><div class="xs muted mono">${p.sku}</div></div>
+        </div>
+        <div style="text-align:right"><div class="mono bold">${fmt(p.revenue)}</div><div class="xs muted">${parseFloat(p.qtySold).toLocaleString('en-BD')} sold</div></div>
+      </div>
+    `).join('');
+  }
+}
+
+// 12-month trend chart
+(async function() {
+  const d = await fetch('/Report/MonthlySales').then(r=>r.json());
+  new Chart(document.getElementById('trendChart').getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: d.labels,
+      datasets: [{
+        label: 'Sales',
+        data: d.sales,
+        borderColor: '#1c1917',
+        backgroundColor: 'rgba(28,25,23,.06)',
+        borderWidth: 2,
+        pointRadius: 3,
+        fill: true,
+        tension: 0.3
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ' ৳ ' + parseFloat(ctx.raw).toLocaleString('en-BD', {minimumFractionDigits:0}) } }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#a8a29e' } },
+        y: { grid: { color: '#e7e5e4' }, ticks: { font: { size: 11 }, color: '#a8a29e', callback: v => '৳'+(v>=1000?(v/1000).toFixed(0)+'k':v) } }
+      }
+    }
+  });
+})();
+</script>
+}

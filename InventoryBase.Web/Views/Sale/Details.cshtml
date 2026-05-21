@@ -1,0 +1,43 @@
+@model InventoryBase.Core.Entities.Sale
+@{ ViewData["Title"] = "Sale " + Model.InvoiceNo; ViewData["NavId"] = "sales"; }
+<div class="content">
+  <div class="page-head">
+    <div><h1 class="page-title">@Model.InvoiceNo</h1><div class="page-sub">@Model.SaleDate.ToString("dd MMM yyyy") · @Model.Customer.Name</div></div>
+    <div class="page-actions"><a class="btn" href="@Url.Action("Index","Sale")">← Back</a></div>
+  </div>
+  <div class="split">
+    <div class="card">
+      <div class="card-head"><div class="card-title">Line items</div></div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead><tr style="background:var(--surface-2)">
+          <th style="padding:10px 14px;font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:500">Product</th>
+          <th style="padding:10px 14px;font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:500;text-align:right">Qty</th>
+          <th style="padding:10px 14px;font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:500;text-align:right">Unit price</th>
+          <th style="padding:10px 14px;font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:500;text-align:right">Subtotal</th>
+        </tr></thead>
+        <tbody>
+          @foreach (var item in Model.Items)
+          {
+            <tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:0 14px;height:44px;vertical-align:middle"><span class="bold">@item.Product.Name</span> <span class="mono muted xs">@item.Product.SKU</span></td>
+              <td style="padding:0 14px;text-align:right" class="mono">@item.Quantity.ToString("N3")</td>
+              <td style="padding:0 14px;text-align:right" class="mono">৳ @item.UnitPrice.ToString("N2")</td>
+              <td style="padding:0 14px;text-align:right" class="mono bold">৳ @item.SubTotal.ToString("N2")</td>
+            </tr>
+          }
+        </tbody>
+        <tfoot><tr style="background:var(--surface-2)"><td colspan="3" style="padding:10px 14px;font-weight:600">Total</td><td style="padding:10px 14px;text-align:right;font-weight:600;font-size:15px" class="mono">৳ @Model.TotalAmount.ToString("N2")</td></tr></tfoot>
+      </table>
+    </div>
+    <div class="card" style="align-self:start">
+      <div class="card-head"><div class="card-title">Details</div></div>
+      <div class="card-body" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px">
+        <div class="muted">Invoice</div><div class="mono bold">@Model.InvoiceNo</div>
+        <div class="muted">Customer</div><div>@Model.Customer.Name</div>
+        <div class="muted">Date</div><div>@Model.SaleDate.ToString("dd MMM yyyy")</div>
+        <div class="muted">Total</div><div class="mono bold">৳ @Model.TotalAmount.ToString("N2")</div>
+        @if (!string.IsNullOrEmpty(Model.Note)) { <div class="muted">Note</div><div>@Model.Note</div> }
+      </div>
+    </div>
+  </div>
+</div>

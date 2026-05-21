@@ -18,7 +18,7 @@ namespace InventoryBase.Core.Entities
         public int CategoryId { get; set; }
         public bool IsActive { get; set; } = true;
         public DateTime CreatedAt { get; set; } = DateTime.Now;
-        public Unit Unit { get; set; } = null!;
-        public Category Category { get; set; } = null!;
+        public Unit? Unit { get; set; }
+        public Category? Category { get; set; }
     }
 }

@@ -16,7 +16,7 @@ namespace InventoryBase.Core.Entities
         public string? Note { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.Now;
 
-        public Customer Customer { get; set; } = null!;
+        public Customer? Customer { get; set; } 
         public ICollection<SaleItem> Items { get; set; } = new List<SaleItem>();
     }
 
@@ -29,7 +29,7 @@ namespace InventoryBase.Core.Entities
         public decimal UnitPrice { get; set; }
         public decimal SubTotal { get; set; }
 
-        public Sale Sale { get; set; } = null!;
-        public Product Product { get; set; } = null!;
+        public Sale? Sale { get; set; }
+        public Product? Product { get; set; }
     }
 }

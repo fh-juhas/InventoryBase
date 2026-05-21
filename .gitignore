@@ -120,3 +120,4 @@ logs/
 *.cache
 *AssemblyInfo*.cs
 *AssemblyInfoInputs*
+/InventoryBase.Web/wwwroot/uploads

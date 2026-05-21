@@ -1,0 +1,73 @@
+@{ ViewData["Title"] = "Stock"; ViewData["NavId"] = "stock"; }
+<div class="content">
+  <div class="page-head">
+    <div><h1 class="page-title">Stock</h1><div class="page-sub">Live inventory levels across all products.</div></div>
+  </div>
+
+  <div class="stat-grid" id="stockStats">
+    <div class="stat"><div class="stat-label">Total stock value</div><div class="stat-value" id="sTotalVal">—</div></div>
+    <div class="stat"><div class="stat-label">Low stock items</div><div class="stat-value" id="sLow" style="color:var(--warning)">—</div></div>
+    <div class="stat"><div class="stat-label">Out of stock</div><div class="stat-value" id="sOut" style="color:var(--danger)">—</div></div>
+    <div class="stat"><div class="stat-label">Active products</div><div class="stat-value" id="sTotal">—</div></div>
+  </div>
+
+  <div class="table-wrap">
+    <div class="table-toolbar">
+      <div class="search-box"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input id="search" placeholder="Search product or SKU…"/></div>
+      <select class="select s2-cat" id="filterCat" style="width:200px"><option value="">All categories</option></select>
+      <select class="select" id="filterStatus" style="width:160px">
+        <option value="">All stock levels</option>
+        <option value="in stock">In stock</option>
+        <option value="low">Low stock (&lt;10)</option>
+        <option value="out">Out of stock</option>
+      </select>
+      <div class="spacer"></div><span class="xs muted" id="rowCount"></span>
+    </div>
+    <div id="stockTable"></div>
+  </div>
+</div>
+@section Scripts {
+<script>
+let filters = { search: '', category: '', status: '' };
+
+fetch('/Stock/Summary').then(r=>r.json()).then(d=>{
+  document.getElementById('sTotalVal').textContent = '৳ '+parseFloat(d.totalValue).toLocaleString('en-BD',{minimumFractionDigits:0});
+  document.getElementById('sLow').textContent   = d.lowCount;
+  document.getElementById('sOut').textContent   = d.outCount;
+  document.getElementById('sTotal').textContent = d.totalProducts;
+});
+
+$.getJSON('/Stock/CategoryList', function(data){
+  data.forEach(c => $('#filterCat').append(new Option(c.text, c.id)));
+  $('#filterCat').trigger('change');
+});
+$('#filterCat').select2({ placeholder: 'All categories', allowClear: true, width: '200px' });
+
+const table = new Tabulator('#stockTable', {
+  ...window.tabulatorDefaults, ajaxURL: '/Stock/Data', ajaxParams: () => ({ ...filters }),
+  initialSort: [{ column: 'qty', dir: 'asc' }],
+  columns: [
+    { title: 'SKU',       field: 'sku',      width: 110,   formatter: c => `<span class="mono">${c.getValue()}</span>` },
+    { title: 'Product',   field: 'name',     widthGrow: 3, formatter: c => `<span class="bold">${c.getValue()}</span>` },
+    { title: 'Category',  field: 'category', widthGrow: 1, formatter: c => `<span class="muted">${c.getValue()}</span>` },
+    { title: 'Unit',      field: 'unit',     width: 70,    formatter: c => `<span class="muted">${c.getValue()}</span>` },
+    { title: 'Qty',       field: 'qty',      width: 90,    hozAlign: 'right',
+      formatter: c => {
+        const v = parseFloat(c.getValue());
+        const cls = v <= 0 ? 'danger' : v < 10 ? 'warning' : 'success';
+        return `<span class="bold" style="color:var(--${cls})">${v.toLocaleString('en-BD',{minimumFractionDigits:0})}</span>`;
+      }
+    },
+    { title: 'Cost/unit', field: 'costPrice', width: 110, hozAlign: 'right', formatter: moneyFormatter },
+    { title: 'Stock value',field: 'stockVal', width: 130, hozAlign: 'right', formatter: moneyFormatter },
+    { title: 'Status',    field: 'status',   width: 110,   formatter: badgeFormatter }
+  ]
+});
+table.on('dataProcessed', () => { document.getElementById('rowCount').textContent = table.getDataCount('active') + ' rows'; });
+
+let deb;
+document.getElementById('search').addEventListener('input', e => { clearTimeout(deb); deb = setTimeout(() => { filters.search = e.target.value; table.setPage(1); }, 350); });
+$('#filterCat').on('change', e => { filters.category = e.target.value || ''; table.setPage(1); });
+document.getElementById('filterStatus').addEventListener('change', e => { filters.status = e.target.value; table.setPage(1); });
+</script>
+}

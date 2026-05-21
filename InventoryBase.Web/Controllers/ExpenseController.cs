@@ -23,7 +23,7 @@ public class ExpenseController : Controller
         return View();
     }
 
-    // Tabulator AJAX — expense rows for a given month/year
+    // ── Tabulator AJAX ──────────────────────────────────────────────────
     [HttpGet]
     public async Task<IActionResult> Data([FromQuery] TabulatorRequest req)
     {
@@ -40,7 +40,7 @@ public class ExpenseController : Controller
         if (req.status == "confirmed") all = all.Where(e => e.Status == ExpenseStatus.Confirmed).ToList();
 
         int total    = all.Count;
-        int lastPage = (int)Math.Ceiling(total / (double)req.size);
+        int lastPage = (int)Math.Ceiling(total / (double)(req.size > 0 ? req.size : 20));
         var page     = all.Skip((req.page - 1) * req.size).Take(req.size).ToList();
 
         return Json(new TabulatorResponse<object>
@@ -58,7 +58,7 @@ public class ExpenseController : Controller
         });
     }
 
-    // Summary stats for the month
+    // ── Month summary (hasDraft, total) ────────────────────────────────
     [HttpGet]
     public async Task<IActionResult> MonthSummary(int month, int year)
     {
@@ -67,31 +67,47 @@ public class ExpenseController : Controller
         return Json(new { hasDraft, total });
     }
 
+    // ── FIX: was [ValidateAntiForgeryToken] + RedirectToAction → now returns JSON
+    // so the JS button handler can reload the table without a page refresh.
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Generate(int month, int year)
     {
-        await _expense.GenerateFromTemplatesAsync(month, year);
-        TempData["Success"] = $"Expenses generated for {month}/{year}.";
-        return RedirectToAction(nameof(Index), new { month, year });
+        try
+        {
+            await _expense.GenerateFromTemplatesAsync(month, year);
+            return Json(new { success = true, message = $"Expenses generated for {month}/{year}." });
+        }
+        catch (Exception ex)
+        {
+            return Json(new { success = false, message = ex.Message });
+        }
     }
 
-    [HttpPost]
+    // ── FIX: same — return JSON not redirect
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Confirm(int month, int year)
+    {
+        try
+        {
+            await _expense.ConfirmMonthAsync(month, year);
+            return Json(new { success = true, message = $"Expenses for {month}/{year} confirmed and locked." });
+        }
+        catch (Exception ex)
+        {
+            return Json(new { success = false, message = ex.Message });
+        }
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> UpdateAmount(string id, decimal amount)
     {
         var realId = _hash.Decode(id);
-        if (realId == null) return BadRequest();
+        if (realId == null) return Json(new { success = false, message = "Invalid id." });
         await _expense.UpdateAmountAsync(realId.Value, amount);
         return Json(new { success = true });
     }
 
-    [HttpPost, ValidateAntiForgeryToken]
-    public async Task<IActionResult> Confirm(int month, int year)
-    {
-        await _expense.ConfirmMonthAsync(month, year);
-        TempData["Success"] = $"Expenses for {month}/{year} confirmed and locked.";
-        return RedirectToAction(nameof(Index), new { month, year });
-    }
-
+    // ── Templates ───────────────────────────────────────────────────────
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Templates() => View(await _expense.GetTemplatesAsync());
 
@@ -102,7 +118,7 @@ public class ExpenseController : Controller
         if (!string.IsNullOrWhiteSpace(req.search))
             all = all.Where(t => t.Name.Contains(req.search, StringComparison.OrdinalIgnoreCase)).ToList();
         int total    = all.Count;
-        int lastPage = (int)Math.Ceiling(total / (double)req.size);
+        int lastPage = (int)Math.Ceiling(total / (double)(req.size > 0 ? req.size : 20));
         var page     = all.Skip((req.page - 1) * req.size).Take(req.size).ToList();
         return Json(new TabulatorResponse<object>
         {
@@ -130,7 +146,7 @@ public class ExpenseController : Controller
     public async Task<IActionResult> DeleteTemplate(string id)
     {
         var realId = _hash.Decode(id);
-        if (realId == null) return BadRequest();
+        if (realId == null) return Json(new { success = false, message = "Invalid id." });
         await _expense.DeleteTemplateAsync(realId.Value);
         return Json(new { success = true });
     }

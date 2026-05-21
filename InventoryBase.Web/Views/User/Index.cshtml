@@ -12,12 +12,15 @@
 <div class="content">
   <div class="page-head">
     <div><h1 class="page-title">Users &amp; Roles</h1><div class="page-sub">People with access to this workspace.</div></div>
-    <div class="page-actions"><a class="btn btn-primary" href="@Url.Action("Create","User")">+ Invite user</a></div>
+    <div class="page-actions">
+      <a class="btn" href="@Url.Action("ChangePassword","Auth")">🔑 Change my password</a>
+      <a class="btn btn-primary" href="@Url.Action("Create","User")">+ Invite user</a>
+    </div>
   </div>
 
-  <div class="role-grid" id="roleGrid">
+  <div class="role-grid">
     <div class="role-card"><h3>Admin</h3><div class="count" id="cntAdmin">—</div><div class="xs muted">Full access</div></div>
-    <div class="role-card"><h3>User</h3><div class="count" id="cntUser">—</div><div class="xs muted">Standard access</div></div>
+    <div class="role-card"><h3>User</h3><div class="count"  id="cntUser">—</div><div class="xs muted">Standard access</div></div>
   </div>
 
   <div class="table-wrap">
@@ -42,31 +45,29 @@
     <div id="userTable"></div>
   </div>
 </div>
+
 @section Scripts {
 <script>
 let filters = { search: '', role: '', status: '' };
 
-// Role counts
 fetch('/User/RoleCounts').then(r => r.json()).then(d => {
   document.getElementById('cntAdmin').textContent = d.admins;
   document.getElementById('cntUser').textContent  = d.users;
 });
 
 const table = new Tabulator('#userTable', {
+  ...window.tabulatorDefaults,
   ajaxURL: '/User/Data',
   ajaxParams: () => ({ ...filters }),
-  ajaxResponse: (url, params, resp) => resp,
-  pagination: true, paginationMode: 'remote',
-  paginationSize: 20, paginationSizeSelector: [10, 20, 50],
-  sortMode: 'remote', layout: 'fitColumns',
-  placeholder: 'No users found.',
   columns: [
     { title: 'Name',   field: 'fullName', widthGrow: 2,
       formatter: c => {
-        const n = c.getValue();
+        const n = c.getValue() || '';
         const initials = n.split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('');
         return `<div style="display:flex;align-items:center;gap:8px">
-          <div style="width:24px;height:24px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:inline-grid;place-items:center;font-size:10px;font-weight:600;flex-shrink:0">${initials}</div>
+          <div style="width:24px;height:24px;border-radius:50%;background:var(--accent-soft);
+            color:var(--accent);display:inline-grid;place-items:center;
+            font-size:10px;font-weight:600;flex-shrink:0">${initials}</div>
           <span class="bold">${n}</span></div>`;
       }
     },
@@ -74,12 +75,17 @@ const table = new Tabulator('#userTable', {
       formatter: c => `<span class="muted">${c.getValue()}</span>` },
     { title: 'Role',   field: 'role',     width: 100 },
     { title: 'Status', field: 'status',   width: 110, formatter: badgeFormatter },
-    { title: '',       field: 'hash',     width: 110,
+    { title: '',       field: 'hash',     width: 230,
       hozAlign: 'right', headerSort: false,
       formatter: cell => {
-        const row = cell.getRow().getData();
-        if (!row.isActive) return '';
-        return `<button onclick="deactivate('${cell.getValue()}')" class="btn btn-ghost btn-sm btn-danger">Deactivate</button>`;
+        const row    = cell.getRow().getData();
+        const hash   = cell.getValue();
+        const uid    = row.identityId;
+        let btns = `<a href="/Auth/ResetPassword/${uid}" class="btn btn-ghost btn-sm">Reset pwd</a>`;
+        if (row.isActive) {
+          btns += ` <button onclick="deactivate('${hash}')" class="btn btn-ghost btn-sm btn-danger">Deactivate</button>`;
+        }
+        return `<div class="row" style="justify-content:flex-end">${btns}</div>`;
       }
     }
   ]
@@ -101,9 +107,17 @@ document.getElementById('filterStatus').addEventListener('change', e => {
 
 async function deactivate(hash) {
   if (!confirm('Deactivate this user?')) return;
-  const d = await apiPost('/User/Deactivate/' + hash);
-  if (d.success) { toastr.success('User deactivated.'); table.replaceData(); fetch('/User/RoleCounts').then(r=>r.json()).then(d=>{document.getElementById('cntAdmin').textContent=d.admins;document.getElementById('cntUser').textContent=d.users;}); }
-  else toastr.error('Failed.');
+  try {
+    const d = await apiPost('/User/Deactivate/' + hash);
+    if (d.success) {
+      toastr.success('User deactivated.');
+      table.replaceData();
+      fetch('/User/RoleCounts').then(r=>r.json()).then(d => {
+        document.getElementById('cntAdmin').textContent = d.admins;
+        document.getElementById('cntUser').textContent  = d.users;
+      });
+    } else toastr.error(d.message || 'Failed.');
+  } catch(e) { toastr.error('Request failed.'); }
 }
 </script>
 }
