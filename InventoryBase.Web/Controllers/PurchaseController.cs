@@ -151,7 +151,7 @@ public class PurchaseController : Controller
     [HttpGet]
     public async Task<IActionResult> ProductSearch(string q)
     {
-        q = q?.Trim() ?? "";          // ← treat null as empty string
+        q = q?.Trim() ?? "";         
 
         var list = await _uow.Products.Query()
             .Include(p => p.Unit)
