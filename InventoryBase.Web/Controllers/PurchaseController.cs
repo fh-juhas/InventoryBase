@@ -56,6 +56,28 @@ public class PurchaseController : Controller
     }
 
     [HttpGet]
+    public async Task<IActionResult> NextInvoiceNo()
+    {
+        var year = DateTime.Now.Year % 100;          // 2-digit: 25
+        var prefix = $"PO-{year:D2}-";
+
+        var last = await _uow.Purchases.Query()
+            .Where(p => p.InvoiceNo.StartsWith(prefix))
+            .OrderByDescending(p => p.InvoiceNo)
+            .Select(p => p.InvoiceNo)
+            .FirstOrDefaultAsync();
+
+        int next = 1;
+        if (last != null)
+        {
+            var seq = last.Replace(prefix, "");
+            if (int.TryParse(seq, out var n)) next = n + 1;
+        }
+
+        return Json(new { invoiceNo = $"{prefix}{next:D4}" });
+    }
+
+    [HttpGet]
     public async Task<IActionResult> Create()
     {
         await PopulateViewBagAsync();
@@ -79,8 +101,16 @@ public class PurchaseController : Controller
         // Auto-generate invoice number if blank
         if (string.IsNullOrWhiteSpace(model.InvoiceNo))
         {
-            var last = await _uow.Purchases.Query().CountAsync();
-            model.InvoiceNo = $"PO-{(last + 1):D4}";
+            var year = DateTime.Now.Year % 100;
+            var prefix = $"PO-{year:D2}-";
+            var last = await _uow.Purchases.Query()
+                .Where(s => s.InvoiceNo.StartsWith(prefix))
+                .OrderByDescending(s => s.InvoiceNo)
+                .Select(s => s.InvoiceNo)
+                .FirstOrDefaultAsync();
+            int seq = 1;
+            if (last != null && int.TryParse(last.Replace(prefix, ""), out var n)) seq = n + 1;
+            model.InvoiceNo = $"{prefix}{seq:D4}";
         }
 
         model.CreatedAt = DateTime.Now;

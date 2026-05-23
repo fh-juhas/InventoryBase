@@ -21,6 +21,28 @@ public class SaleController : Controller
     public IActionResult Index() => View();
 
     [HttpGet]
+    public async Task<IActionResult> NextInvoiceNo()
+    {
+        var year = DateTime.Now.Year % 100;          // 2-digit: 25
+        var prefix = $"INV-{year:D2}-";
+
+        var last = await _uow.Sales.Query()
+            .Where(s => s.InvoiceNo.StartsWith(prefix))
+            .OrderByDescending(s => s.InvoiceNo)
+            .Select(s => s.InvoiceNo)
+            .FirstOrDefaultAsync();
+
+        int next = 1;
+        if (last != null)
+        {
+            var seq = last.Replace(prefix, "");
+            if (int.TryParse(seq, out var n)) next = n + 1;
+        }
+
+        return Json(new { invoiceNo = $"{prefix}{next:D4}" });
+    }
+
+    [HttpGet]
     public async Task<IActionResult> Data([FromQuery] TabulatorRequest req)
     {
         var q = _uow.Sales.Query().Include(s => s.Customer).AsQueryable();
@@ -93,11 +115,25 @@ public class SaleController : Controller
             }
         }
 
+        //if (string.IsNullOrWhiteSpace(model.InvoiceNo))
+        //{
+        //    var last = await _uow.Sales.Query().CountAsync();
+        //    model.InvoiceNo = $"INV-{(last + 1):D4}";
+        //}
         if (string.IsNullOrWhiteSpace(model.InvoiceNo))
         {
-            var last = await _uow.Sales.Query().CountAsync();
-            model.InvoiceNo = $"INV-{(last + 1):D4}";
+            var year = DateTime.Now.Year % 100;
+            var prefix = $"INV-{year:D2}-";
+            var last = await _uow.Sales.Query()
+                .Where(s => s.InvoiceNo.StartsWith(prefix))
+                .OrderByDescending(s => s.InvoiceNo)
+                .Select(s => s.InvoiceNo)
+                .FirstOrDefaultAsync();
+            int seq = 1;
+            if (last != null && int.TryParse(last.Replace(prefix, ""), out var n)) seq = n + 1;
+            model.InvoiceNo = $"{prefix}{seq:D4}";
         }
+
 
         model.CreatedAt = DateTime.Now;
         model.Items     = new List<SaleItem>();
@@ -167,9 +203,10 @@ public class SaleController : Controller
     [HttpGet]
     public async Task<IActionResult> ProductSearch(string q)
     {
+        q = q?.Trim() ?? "";
         var products = await _uow.Products.Query()
             .Include(p => p.Unit)
-            .Where(p => p.IsActive && (p.Name.Contains(q) || p.SKU.Contains(q)))
+            .Where(p => p.IsActive && (string.IsNullOrEmpty(q) || p.Name.Contains(q) || p.SKU.Contains(q)))
             .Take(20).ToListAsync();
 
         var stockMap = await _uow.StockLedger.Query()

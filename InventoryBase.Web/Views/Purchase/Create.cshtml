@@ -21,7 +21,11 @@
           <div class="card-head"><div class="card-title">Purchase details</div></div>
           <div class="card-body">
             <div class="form-grid">
-              <div class="field"><label class="label">Invoice no.</label><input class="input mono" name="InvoiceNo" placeholder="Auto-generated if blank"/></div>
+
+                            <input class="input mono" name="InvoiceNo" id="invoiceNo" readonly
+                                   placeholder="Generating…" style="background:var(--surface-2);cursor:default;color:var(--muted)" />
+
+                @* <div class="field"><label class="label">Invoice no.</label><input class="input mono" name="InvoiceNo" placeholder="Auto-generated if blank"/></div> *@
               <div class="field"><label class="label">Date <span class="req">*</span></label><input class="input" name="PurchaseDate" type="date" value="@DateTime.Now.ToString("yyyy-MM-dd")" required/></div>
               <div class="field span-2">
                 <label class="label">Supplier <span class="req">*</span></label>
@@ -64,6 +68,15 @@
 @section Scripts {
 <script>
 let lineIdx = 0;
+
+        // Fetch and lock the invoice number on page load
+        fetch('/Purchase/NextInvoiceNo')
+          .then(r => r.json())
+          .then(d => {
+            const el = document.getElementById('invoiceNo');
+            el.value = d.invoiceNo;
+            el.style.color = '';   // restore normal text color
+          });
 
 function addLine() {
   const idx = lineIdx++;
