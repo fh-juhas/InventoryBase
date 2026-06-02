@@ -22,38 +22,45 @@ public class CustomerController : Controller
     [HttpGet]
     public async Task<IActionResult> Data([FromQuery] TabulatorRequest req)
     {
-        var q = _uow.Customers.Query().AsQueryable();
-
-        if (!string.IsNullOrWhiteSpace(req.search))
-            q = q.Where(c => c.Name.Contains(req.search) ||
-                             (c.Phone != null && c.Phone.Contains(req.search)) ||
-                             (c.Email != null && c.Email.Contains(req.search)));
-
-        if (req.status == "active")   q = q.Where(c => c.IsActive);
-        if (req.status == "inactive") q = q.Where(c => !c.IsActive);
-
-        q = req.dir == "desc"
-            ? q.OrderByDescending(c => c.Name)
-            : q.OrderBy(c => c.Name);
-
-        int total    = await q.CountAsync();
-        int lastPage = (int)Math.Ceiling(total / (double)(req.size > 0 ? req.size : 20));
-        var items    = await q.Skip((req.page - 1) * req.size).Take(req.size).ToListAsync();
-
-        return Json(new TabulatorResponse<object>
+        try
         {
-            last_page = Math.Max(lastPage, 1),
-            data = items.Select(c => new
+            var q = _uow.Customers.Query().AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(req.search))
+                q = q.Where(c => c.Name.Contains(req.search) ||
+                                 (c.Phone != null && c.Phone.Contains(req.search)) ||
+                                 (c.Email != null && c.Email.Contains(req.search)));
+
+            if (req.status == "active")   q = q.Where(c => c.IsActive);
+            if (req.status == "inactive") q = q.Where(c => !c.IsActive);
+
+            q = req.dir == "desc"
+                ? q.OrderByDescending(c => c.Name)
+                : q.OrderBy(c => c.Name);
+
+            int total    = await q.CountAsync();
+            int lastPage = (int)Math.Ceiling(total / (double)(req.size > 0 ? req.size : 20));
+            var items    = await q.Skip((req.page - 1) * req.size).Take(req.size).ToListAsync();
+
+            return Json(new TabulatorResponse<object>
             {
-                hash     = _hash.Encode(c.Id),
-                name     = c.Name,
-                phone    = c.Phone ?? "—",
-                email    = c.Email ?? "—",
-                address  = c.Address ?? "—",
-                status   = c.IsActive ? "active" : "inactive",
-                isActive = c.IsActive
-            }).ToList<object>()
-        });
+                last_page = Math.Max(lastPage, 1),
+                data = items.Select(c => new
+                {
+                    hash     = _hash.Encode(c.Id),
+                    name     = c.Name,
+                    phone    = c.Phone ?? "—",
+                    email    = c.Email ?? "—",
+                    address  = c.Address ?? "—",
+                    status   = c.IsActive ? "active" : "inactive",
+                    isActive = c.IsActive
+                }).ToList<object>()
+            });
+        }
+        catch (Exception)
+        {
+            return Json(new TabulatorResponse<object> { last_page = 1, data = new List<object>() });
+        }
     }
 
     [HttpGet] public IActionResult Create() => View();
@@ -61,51 +68,83 @@ public class CustomerController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(Customer model)
     {
-        if (!ModelState.IsValid) return View(model);
-        model.IsActive  = true;
-        model.CreatedAt = DateTime.Now;
-        await _uow.Customers.AddAsync(model);
-        await _uow.SaveChangesAsync();
-        TempData["Success"] = $"Customer \"{model.Name}\" created.";
-        return RedirectToAction(nameof(Index));
+        try
+        {
+            if (!ModelState.IsValid) return View(model);
+            model.IsActive  = true;
+            model.CreatedAt = DateTime.Now;
+            await _uow.Customers.AddAsync(model);
+            await _uow.SaveChangesAsync();
+            TempData["Success"] = $"Customer \"{model.Name}\" created.";
+            return RedirectToAction(nameof(Index));
+        }
+        catch (Exception)
+        {
+            ModelState.AddModelError("", "An unexpected error occurred while saving the customer. Please try again.");
+            return View(model);
+        }
     }
 
     [HttpGet]
     public async Task<IActionResult> Edit(string id)
     {
-        var realId = _hash.Decode(id);
-        if (realId == null) return BadRequest();
-        var c = await _uow.Customers.GetByIdAsync(realId.Value);
-        if (c == null) return NotFound();
-        ViewBag.HashId = id;
-        return View(c);
+        try
+        {
+            var realId = _hash.Decode(id);
+            if (realId == null) return BadRequest();
+            var c = await _uow.Customers.GetByIdAsync(realId.Value);
+            if (c == null) return NotFound();
+            ViewBag.HashId = id;
+            return View(c);
+        }
+        catch (Exception)
+        {
+            TempData["Error"] = "An error occurred loading the customer.";
+            return RedirectToAction(nameof(Index));
+        }
     }
 
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(string id, Customer model)
     {
-        var realId = _hash.Decode(id);
-        if (realId == null) return BadRequest();
-        model.Id = realId.Value;
-        if (!ModelState.IsValid) { ViewBag.HashId = id; return View(model); }
-        _uow.Customers.Update(model);
-        await _uow.SaveChangesAsync();
-        TempData["Success"] = $"Customer \"{model.Name}\" updated.";
-        return RedirectToAction(nameof(Index));
+        try
+        {
+            var realId = _hash.Decode(id);
+            if (realId == null) return BadRequest();
+            model.Id = realId.Value;
+            if (!ModelState.IsValid) { ViewBag.HashId = id; return View(model); }
+            _uow.Customers.Update(model);
+            await _uow.SaveChangesAsync();
+            TempData["Success"] = $"Customer \"{model.Name}\" updated.";
+            return RedirectToAction(nameof(Index));
+        }
+        catch (Exception)
+        {
+            ModelState.AddModelError("", "An unexpected error occurred while updating the customer. Please try again.");
+            ViewBag.HashId = id;
+            return View(model);
+        }
     }
 
     [Authorize(Roles = "Admin"), HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Delete(string id)
     {
-        var realId = _hash.Decode(id);
-        if (realId == null) return Json(new { success = false, message = "Invalid id." });
-        var hasSales = await _uow.Sales.Query().AnyAsync(s => s.CustomerId == realId.Value);
-        if (hasSales)
-            return Json(new { success = false, message = "Cannot delete — customer has sale records." });
-        var c = await _uow.Customers.GetByIdAsync(realId.Value);
-        if (c == null) return Json(new { success = false, message = "Not found." });
-        _uow.Customers.Remove(c);
-        await _uow.SaveChangesAsync();
-        return Json(new { success = true });
+        try
+        {
+            var realId = _hash.Decode(id);
+            if (realId == null) return Json(new { success = false, message = "Invalid id." });
+            var hasSales = await _uow.Sales.Query().AnyAsync(s => s.CustomerId == realId.Value);
+            if (hasSales)
+                return Json(new { success = false, message = "Cannot delete — customer has sale records." });
+            var c = await _uow.Customers.GetByIdAsync(realId.Value);
+            if (c == null) return Json(new { success = false, message = "Not found." });
+            _uow.Customers.Remove(c);
+            await _uow.SaveChangesAsync();
+            return Json(new { success = true });
+        }
+        catch (Exception)
+        {
+            return Json(new { success = false, message = "An unexpected error occurred while deleting the customer." });
+        }
     }
 }

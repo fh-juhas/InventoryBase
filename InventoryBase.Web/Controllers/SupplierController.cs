@@ -22,38 +22,45 @@ public class SupplierController : Controller
     [HttpGet]
     public async Task<IActionResult> Data([FromQuery] TabulatorRequest req)
     {
-        var q = _uow.Suppliers.Query().AsQueryable();
-
-        if (!string.IsNullOrWhiteSpace(req.search))
-            q = q.Where(s => s.Name.Contains(req.search) ||
-                             (s.Phone != null && s.Phone.Contains(req.search)) ||
-                             (s.Email != null && s.Email.Contains(req.search)));
-
-        if (req.status == "active")   q = q.Where(s => s.IsActive);
-        if (req.status == "inactive") q = q.Where(s => !s.IsActive);
-
-        q = req.dir == "desc"
-            ? q.OrderByDescending(s => s.Name)
-            : q.OrderBy(s => s.Name);
-
-        int total    = await q.CountAsync();
-        int lastPage = (int)Math.Ceiling(total / (double)(req.size > 0 ? req.size : 20));
-        var items    = await q.Skip((req.page - 1) * req.size).Take(req.size).ToListAsync();
-
-        return Json(new TabulatorResponse<object>
+        try
         {
-            last_page = Math.Max(lastPage, 1),
-            data = items.Select(s => new
+            var q = _uow.Suppliers.Query().AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(req.search))
+                q = q.Where(s => s.Name.Contains(req.search) ||
+                                 (s.Phone != null && s.Phone.Contains(req.search)) ||
+                                 (s.Email != null && s.Email.Contains(req.search)));
+
+            if (req.status == "active")   q = q.Where(s => s.IsActive);
+            if (req.status == "inactive") q = q.Where(s => !s.IsActive);
+
+            q = req.dir == "desc"
+                ? q.OrderByDescending(s => s.Name)
+                : q.OrderBy(s => s.Name);
+
+            int total    = await q.CountAsync();
+            int lastPage = (int)Math.Ceiling(total / (double)(req.size > 0 ? req.size : 20));
+            var items    = await q.Skip((req.page - 1) * req.size).Take(req.size).ToListAsync();
+
+            return Json(new TabulatorResponse<object>
             {
-                hash          = _hash.Encode(s.Id),
-                name          = s.Name,
-                contactPerson = s.ContactPerson ?? "—",
-                phone         = s.Phone ?? "—",
-                email         = s.Email ?? "—",
-                status        = s.IsActive ? "active" : "inactive",
-                isActive      = s.IsActive
-            }).ToList<object>()
-        });
+                last_page = Math.Max(lastPage, 1),
+                data = items.Select(s => new
+                {
+                    hash          = _hash.Encode(s.Id),
+                    name          = s.Name,
+                    contactPerson = s.ContactPerson ?? "—",
+                    phone         = s.Phone ?? "—",
+                    email         = s.Email ?? "—",
+                    status        = s.IsActive ? "active" : "inactive",
+                    isActive      = s.IsActive
+                }).ToList<object>()
+            });
+        }
+        catch (Exception)
+        {
+            return Json(new TabulatorResponse<object> { last_page = 1, data = new List<object>() });
+        }
     }
 
     [HttpGet] public IActionResult Create() => View();
@@ -61,51 +68,83 @@ public class SupplierController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(Supplier model)
     {
-        if (!ModelState.IsValid) return View(model);
-        model.IsActive  = true;
-        model.CreatedAt = DateTime.Now;
-        await _uow.Suppliers.AddAsync(model);
-        await _uow.SaveChangesAsync();
-        TempData["Success"] = $"Supplier \"{model.Name}\" created.";
-        return RedirectToAction(nameof(Index));
+        try
+        {
+            if (!ModelState.IsValid) return View(model);
+            model.IsActive  = true;
+            model.CreatedAt = DateTime.Now;
+            await _uow.Suppliers.AddAsync(model);
+            await _uow.SaveChangesAsync();
+            TempData["Success"] = $"Supplier \"{model.Name}\" created.";
+            return RedirectToAction(nameof(Index));
+        }
+        catch (Exception)
+        {
+            ModelState.AddModelError("", "An unexpected error occurred while saving the supplier. Please try again.");
+            return View(model);
+        }
     }
 
     [HttpGet]
     public async Task<IActionResult> Edit(string id)
     {
-        var realId = _hash.Decode(id);
-        if (realId == null) return BadRequest();
-        var s = await _uow.Suppliers.GetByIdAsync(realId.Value);
-        if (s == null) return NotFound();
-        ViewBag.HashId = id;
-        return View(s);
+        try
+        {
+            var realId = _hash.Decode(id);
+            if (realId == null) return BadRequest();
+            var s = await _uow.Suppliers.GetByIdAsync(realId.Value);
+            if (s == null) return NotFound();
+            ViewBag.HashId = id;
+            return View(s);
+        }
+        catch (Exception)
+        {
+            TempData["Error"] = "An error occurred loading the supplier.";
+            return RedirectToAction(nameof(Index));
+        }
     }
 
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(string id, Supplier model)
     {
-        var realId = _hash.Decode(id);
-        if (realId == null) return BadRequest();
-        model.Id = realId.Value;
-        if (!ModelState.IsValid) { ViewBag.HashId = id; return View(model); }
-        _uow.Suppliers.Update(model);
-        await _uow.SaveChangesAsync();
-        TempData["Success"] = $"Supplier \"{model.Name}\" updated.";
-        return RedirectToAction(nameof(Index));
+        try
+        {
+            var realId = _hash.Decode(id);
+            if (realId == null) return BadRequest();
+            model.Id = realId.Value;
+            if (!ModelState.IsValid) { ViewBag.HashId = id; return View(model); }
+            _uow.Suppliers.Update(model);
+            await _uow.SaveChangesAsync();
+            TempData["Success"] = $"Supplier \"{model.Name}\" updated.";
+            return RedirectToAction(nameof(Index));
+        }
+        catch (Exception)
+        {
+            ModelState.AddModelError("", "An unexpected error occurred while updating the supplier. Please try again.");
+            ViewBag.HashId = id;
+            return View(model);
+        }
     }
 
     [Authorize(Roles = "Admin"), HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Delete(string id)
     {
-        var realId = _hash.Decode(id);
-        if (realId == null) return Json(new { success = false, message = "Invalid id." });
-        var hasPurchases = await _uow.Purchases.Query().AnyAsync(p => p.SupplierId == realId.Value);
-        if (hasPurchases)
-            return Json(new { success = false, message = "Cannot delete — supplier has purchase records." });
-        var s = await _uow.Suppliers.GetByIdAsync(realId.Value);
-        if (s == null) return Json(new { success = false, message = "Not found." });
-        _uow.Suppliers.Remove(s);
-        await _uow.SaveChangesAsync();
-        return Json(new { success = true });
+        try
+        {
+            var realId = _hash.Decode(id);
+            if (realId == null) return Json(new { success = false, message = "Invalid id." });
+            var hasPurchases = await _uow.Purchases.Query().AnyAsync(p => p.SupplierId == realId.Value);
+            if (hasPurchases)
+                return Json(new { success = false, message = "Cannot delete — supplier has purchase records." });
+            var s = await _uow.Suppliers.GetByIdAsync(realId.Value);
+            if (s == null) return Json(new { success = false, message = "Not found." });
+            _uow.Suppliers.Remove(s);
+            await _uow.SaveChangesAsync();
+            return Json(new { success = true });
+        }
+        catch (Exception)
+        {
+            return Json(new { success = false, message = "An unexpected error occurred while deleting the supplier." });
+        }
     }
 }

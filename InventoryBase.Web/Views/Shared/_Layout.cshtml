@@ -391,6 +391,14 @@
         {
             <text>toastr.info('@Html.Raw(Html.Encode(TempData["Info"]))');    </text>
         }
+        @foreach (var _me in ViewContext.ModelState.Values
+            .SelectMany(v => v.Errors)
+            .Select(e => e.ErrorMessage)
+            .Where(m => !string.IsNullOrEmpty(m))
+            .Distinct())
+        {
+            <text>toastr.error(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(_me)));</text>
+        }
 
         // ── CSRF token (used by all fetch POSTs) ──────────────────────────────
         window.__token = document.querySelector('meta[name="__RequestVerificationToken"]')?.content

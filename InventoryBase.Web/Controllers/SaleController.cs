@@ -23,204 +23,245 @@ public class SaleController : Controller
     [HttpGet]
     public async Task<IActionResult> NextInvoiceNo()
     {
-        var year = DateTime.Now.Year % 100;          // 2-digit: 25
-        var prefix = $"INV-{year:D2}-";
-
-        var last = await _uow.Sales.Query()
-            .Where(s => s.InvoiceNo.StartsWith(prefix))
-            .OrderByDescending(s => s.InvoiceNo)
-            .Select(s => s.InvoiceNo)
-            .FirstOrDefaultAsync();
-
-        int next = 1;
-        if (last != null)
+        try
         {
-            var seq = last.Replace(prefix, "");
-            if (int.TryParse(seq, out var n)) next = n + 1;
+            var year   = DateTime.Now.Year % 100;
+            var prefix = $"INV-{year:D2}-";
+            var last   = await _uow.Sales.Query()
+                .Where(s => s.InvoiceNo.StartsWith(prefix))
+                .OrderByDescending(s => s.InvoiceNo)
+                .Select(s => s.InvoiceNo)
+                .FirstOrDefaultAsync();
+            int next = 1;
+            if (last != null)
+            {
+                var seq = last.Replace(prefix, "");
+                if (int.TryParse(seq, out var n)) next = n + 1;
+            }
+            return Json(new { invoiceNo = $"{prefix}{next:D4}" });
         }
-
-        return Json(new { invoiceNo = $"{prefix}{next:D4}" });
+        catch (Exception)
+        {
+            return StatusCode(500);
+        }
     }
 
     [HttpGet]
     public async Task<IActionResult> Data([FromQuery] TabulatorRequest req)
     {
-        var q = _uow.Sales.Query().Include(s => s.Customer).AsQueryable();
-
-        if (!string.IsNullOrWhiteSpace(req.search))
-            q = q.Where(s => s.InvoiceNo.Contains(req.search) ||
-                             s.Customer.Name.Contains(req.search));
-
-        q = (req.field, req.dir) switch {
-            ("saleDate",    "asc")  => q.OrderBy(s => s.SaleDate),
-            ("totalAmount", "asc")  => q.OrderBy(s => s.TotalAmount),
-            ("totalAmount", "desc") => q.OrderByDescending(s => s.TotalAmount),
-            _                       => q.OrderByDescending(s => s.SaleDate)
-        };
-
-        int total    = await q.CountAsync();
-        int lastPage = (int)Math.Ceiling(total / (double)(req.size > 0 ? req.size : 20));
-        var items    = await q.Skip((req.page - 1) * req.size).Take(req.size).ToListAsync();
-
-        return Json(new TabulatorResponse<object>
+        try
         {
-            last_page = Math.Max(lastPage, 1),
-            data = items.Select(s => new
+            var q = _uow.Sales.Query().Include(s => s.Customer).AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(req.search))
+                q = q.Where(s => s.InvoiceNo.Contains(req.search) ||
+                                 s.Customer.Name.Contains(req.search));
+
+            q = (req.field, req.dir) switch {
+                ("saleDate",    "asc")  => q.OrderBy(s => s.SaleDate),
+                ("totalAmount", "asc")  => q.OrderBy(s => s.TotalAmount),
+                ("totalAmount", "desc") => q.OrderByDescending(s => s.TotalAmount),
+                _                       => q.OrderByDescending(s => s.SaleDate)
+            };
+
+            int total    = await q.CountAsync();
+            int lastPage = (int)Math.Ceiling(total / (double)(req.size > 0 ? req.size : 20));
+            var items    = await q.Skip((req.page - 1) * req.size).Take(req.size).ToListAsync();
+
+            return Json(new TabulatorResponse<object>
             {
-                hash        = _hash.Encode(s.Id),
-                invoiceNo   = s.InvoiceNo,
-                customer    = s.Customer.Name,
-                saleDate    = s.SaleDate.ToString("dd MMM yyyy"),
-                totalAmount = s.TotalAmount,
-                note        = s.Note ?? "—"
-            }).ToList<object>()
-        });
+                last_page = Math.Max(lastPage, 1),
+                data = items.Select(s => new
+                {
+                    hash        = _hash.Encode(s.Id),
+                    invoiceNo   = s.InvoiceNo,
+                    customer    = s.Customer.Name,
+                    saleDate    = s.SaleDate.ToString("dd MMM yyyy"),
+                    totalAmount = s.TotalAmount,
+                    note        = s.Note ?? "—"
+                }).ToList<object>()
+            });
+        }
+        catch (Exception)
+        {
+            return Json(new TabulatorResponse<object> { last_page = 1, data = new List<object>() });
+        }
     }
 
     [HttpGet]
     public async Task<IActionResult> Create()
     {
-        await PopulateViewBagAsync();
-        return View();
+        try
+        {
+            await PopulateViewBagAsync();
+            return View();
+        }
+        catch (Exception)
+        {
+            TempData["Error"] = "An error occurred loading the form.";
+            return RedirectToAction(nameof(Index));
+        }
     }
 
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(
-        [FromForm] Sale    model,
+        [FromForm] Sale      model,
         [FromForm] int[]     productIds,
         [FromForm] decimal[] quantities,
         [FromForm] decimal[] unitPrices)
     {
-        if (!ModelState.IsValid) { await PopulateViewBagAsync(); return View(model); }
-        if (productIds.Length == 0)
+        try
         {
-            ModelState.AddModelError("", "Add at least one product line.");
-            await PopulateViewBagAsync(); return View(model);
-        }
-
-        // Check available stock for each line
-        for (int i = 0; i < productIds.Length; i++)
-        {
-            var pid       = productIds[i];
-            var requested = quantities[i];
-            var available = await _uow.StockLedger.Query()
-                .Where(s => s.ProductId == pid)
-                .SumAsync(s => (decimal?)s.Quantity) ?? 0;
-
-            if (available < requested)
+            if (!ModelState.IsValid) { await PopulateViewBagAsync(); return View(model); }
+            if (productIds.Length == 0)
             {
-                var product = await _uow.Products.GetByIdAsync(pid);
-                ModelState.AddModelError("", $"Insufficient stock for \"{product?.Name}\" — available: {available}");
+                ModelState.AddModelError("", "Add at least one product line.");
                 await PopulateViewBagAsync(); return View(model);
             }
-        }
 
-        //if (string.IsNullOrWhiteSpace(model.InvoiceNo))
-        //{
-        //    var last = await _uow.Sales.Query().CountAsync();
-        //    model.InvoiceNo = $"INV-{(last + 1):D4}";
-        //}
-        if (string.IsNullOrWhiteSpace(model.InvoiceNo))
-        {
-            var year = DateTime.Now.Year % 100;
-            var prefix = $"INV-{year:D2}-";
-            var last = await _uow.Sales.Query()
-                .Where(s => s.InvoiceNo.StartsWith(prefix))
-                .OrderByDescending(s => s.InvoiceNo)
-                .Select(s => s.InvoiceNo)
-                .FirstOrDefaultAsync();
-            int seq = 1;
-            if (last != null && int.TryParse(last.Replace(prefix, ""), out var n)) seq = n + 1;
-            model.InvoiceNo = $"{prefix}{seq:D4}";
-        }
-
-
-        model.CreatedAt = DateTime.Now;
-        model.Items     = new List<SaleItem>();
-
-        for (int i = 0; i < productIds.Length; i++)
-        {
-            var qty   = quantities[i];
-            var price = unitPrices[i];
-            model.Items.Add(new SaleItem
+            // Check available stock for each line
+            for (int i = 0; i < productIds.Length; i++)
             {
-                ProductId = productIds[i],
-                Quantity  = qty,
-                UnitPrice = price,
-                SubTotal  = qty * price
-            });
-        }
-        model.TotalAmount = model.Items.Sum(x => x.SubTotal);
+                var pid       = productIds[i];
+                var requested = quantities[i];
+                var available = await _uow.StockLedger.Query()
+                    .Where(s => s.ProductId == pid)
+                    .SumAsync(s => (decimal?)s.Quantity) ?? 0;
 
-        await _uow.Sales.AddAsync(model);
-        await _uow.SaveChangesAsync();
+                if (available < requested)
+                {
+                    var product = await _uow.Products.GetByIdAsync(pid);
+                    ModelState.AddModelError("", $"Insufficient stock for \"{product?.Name}\" — available: {available}");
+                    await PopulateViewBagAsync(); return View(model);
+                }
+            }
 
-        // Write StockLedger entries (negative = stock out)
-        foreach (var item in model.Items)
-        {
-            await _uow.StockLedger.AddAsync(new StockLedger
+            if (string.IsNullOrWhiteSpace(model.InvoiceNo))
             {
-                ProductId    = item.ProductId,
-                Quantity     = -item.Quantity,        // negative = out
-                MovementType = StockMovementType.Sale,
-                ReferenceId  = model.Id,
-                Note         = $"Sale {model.InvoiceNo}",
-                CreatedAt    = DateTime.Now
-            });
-        }
-        await _uow.SaveChangesAsync();
+                var year   = DateTime.Now.Year % 100;
+                var prefix = $"INV-{year:D2}-";
+                var last   = await _uow.Sales.Query()
+                    .Where(s => s.InvoiceNo.StartsWith(prefix))
+                    .OrderByDescending(s => s.InvoiceNo)
+                    .Select(s => s.InvoiceNo)
+                    .FirstOrDefaultAsync();
+                int seq = 1;
+                if (last != null && int.TryParse(last.Replace(prefix, ""), out var n)) seq = n + 1;
+                model.InvoiceNo = $"{prefix}{seq:D4}";
+            }
 
-        TempData["Success"] = $"Sale {model.InvoiceNo} saved.";
-        return RedirectToAction(nameof(Index));
+            model.CreatedAt = DateTime.Now;
+            model.Items     = new List<SaleItem>();
+
+            for (int i = 0; i < productIds.Length; i++)
+            {
+                var qty   = quantities[i];
+                var price = unitPrices[i];
+                model.Items.Add(new SaleItem
+                {
+                    ProductId = productIds[i],
+                    Quantity  = qty,
+                    UnitPrice = price,
+                    SubTotal  = qty * price
+                });
+            }
+            model.TotalAmount = model.Items.Sum(x => x.SubTotal);
+
+            await _uow.Sales.AddAsync(model);
+            await _uow.SaveChangesAsync();
+
+            foreach (var item in model.Items)
+            {
+                await _uow.StockLedger.AddAsync(new StockLedger
+                {
+                    ProductId    = item.ProductId,
+                    Quantity     = -item.Quantity,
+                    MovementType = StockMovementType.Sale,
+                    ReferenceId  = model.Id,
+                    Note         = $"Sale {model.InvoiceNo}",
+                    CreatedAt    = DateTime.Now
+                });
+            }
+            await _uow.SaveChangesAsync();
+
+            TempData["Success"] = $"Sale {model.InvoiceNo} saved.";
+            return RedirectToAction(nameof(Index));
+        }
+        catch (Exception)
+        {
+            ModelState.AddModelError("", "An unexpected error occurred while saving the sale. Please try again.");
+            await PopulateViewBagAsync();
+            return View(model);
+        }
     }
 
     [HttpGet]
     public async Task<IActionResult> Details(string id)
     {
-        var realId = _hash.Decode(id);
-        if (realId == null) return BadRequest();
-        var sale = await _uow.Sales.Query()
-            .Include(s => s.Customer)
-            .Include(s => s.Items).ThenInclude(i => i.Product)
-            .FirstOrDefaultAsync(s => s.Id == realId.Value);
-        if (sale == null) return NotFound();
-        ViewBag.HashId = id;
-        return View(sale);
+        try
+        {
+            var realId = _hash.Decode(id);
+            if (realId == null) return BadRequest();
+            var sale = await _uow.Sales.Query()
+                .Include(s => s.Customer)
+                .Include(s => s.Items).ThenInclude(i => i.Product)
+                .FirstOrDefaultAsync(s => s.Id == realId.Value);
+            if (sale == null) return NotFound();
+            ViewBag.HashId = id;
+            return View(sale);
+        }
+        catch (Exception)
+        {
+            TempData["Error"] = "An error occurred loading the sale details.";
+            return RedirectToAction(nameof(Index));
+        }
     }
 
-    // Customer dropdown for Select2
     [HttpGet]
     public async Task<IActionResult> CustomerList()
     {
-        var list = await _uow.Customers.Query()
-            .Where(c => c.IsActive).OrderBy(c => c.Name)
-            .Select(c => new { id = c.Id, text = c.Name })
-            .ToListAsync();
-        return Json(list);
+        try
+        {
+            var list = await _uow.Customers.Query()
+                .Where(c => c.IsActive).OrderBy(c => c.Name)
+                .Select(c => new { id = c.Id, text = c.Name })
+                .ToListAsync();
+            return Json(list);
+        }
+        catch (Exception)
+        {
+            return Json(new List<object>());
+        }
     }
 
-    // Product search for line items (includes live stock)
     [HttpGet]
     public async Task<IActionResult> ProductSearch(string q)
     {
-        q = q?.Trim() ?? "";
-        var products = await _uow.Products.Query()
-            .Include(p => p.Unit)
-            .Where(p => p.IsActive && (string.IsNullOrEmpty(q) || p.Name.Contains(q) || p.SKU.Contains(q)))
-            .Take(20).ToListAsync();
+        try
+        {
+            q = q?.Trim() ?? "";
+            var products = await _uow.Products.Query()
+                .Include(p => p.Unit)
+                .Where(p => p.IsActive && (string.IsNullOrEmpty(q) || p.Name.Contains(q) || p.SKU.Contains(q)))
+                .Take(20).ToListAsync();
 
-        var stockMap = await _uow.StockLedger.Query()
-            .GroupBy(s => s.ProductId)
-            .Select(g => new { ProductId = g.Key, Qty = g.Sum(x => x.Quantity) })
-            .ToListAsync();
+            var stockMap = await _uow.StockLedger.Query()
+                .GroupBy(s => s.ProductId)
+                .Select(g => new { ProductId = g.Key, Qty = g.Sum(x => x.Quantity) })
+                .ToListAsync();
 
-        return Json(products.Select(p => new {
-            id    = p.Id,
-            text  = $"{p.SKU} — {p.Name}",
-            unit  = p.Unit?.Name ?? "",
-            price = p.SalePrice,
-            stock = stockMap.FirstOrDefault(s => s.ProductId == p.Id)?.Qty ?? 0
-        }));
+            return Json(products.Select(p => new {
+                id    = p.Id,
+                text  = $"{p.SKU} — {p.Name}",
+                unit  = p.Unit?.Name ?? "",
+                price = p.SalePrice,
+                stock = stockMap.FirstOrDefault(s => s.ProductId == p.Id)?.Qty ?? 0
+            }));
+        }
+        catch (Exception)
+        {
+            return Json(new List<object>());
+        }
     }
 
     private async Task PopulateViewBagAsync()
