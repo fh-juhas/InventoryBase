@@ -218,6 +218,169 @@ public class SaleController : Controller
     }
 
     [HttpGet]
+    public async Task<IActionResult> Edit(string id)
+    {
+        try
+        {
+            var realId = _hash.Decode(id);
+            if (realId == null) return BadRequest();
+            var sale = await _uow.Sales.Query()
+                .Include(s => s.Customer)
+                .Include(s => s.Items).ThenInclude(i => i.Product).ThenInclude(p => p!.Unit)
+                .FirstOrDefaultAsync(s => s.Id == realId.Value);
+            if (sale == null) return NotFound();
+
+            var stockMap = await _uow.StockLedger.Query()
+                .GroupBy(s => s.ProductId)
+                .Select(g => new { ProductId = g.Key, Qty = g.Sum(x => x.Quantity) })
+                .ToListAsync();
+
+            await PopulateViewBagAsync();
+            ViewBag.HashId = id;
+            ViewBag.ExistingItems = sale.Items.Select(i => new
+            {
+                id        = i.ProductId,
+                text      = $"{i.Product!.SKU} — {i.Product.Name}",
+                unit      = i.Product.Unit?.Name ?? "—",
+                qty       = i.Quantity,
+                unitPrice = i.UnitPrice,
+                stock     = stockMap.FirstOrDefault(s => s.ProductId == i.ProductId)?.Qty ?? 0
+            }).ToList();
+            return View(sale);
+        }
+        catch (Exception)
+        {
+            TempData["Error"] = "An error occurred loading the sale.";
+            return RedirectToAction(nameof(Index));
+        }
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Edit(
+        string id,
+        [FromForm] Sale      model,
+        [FromForm] int[]     productIds,
+        [FromForm] decimal[] quantities,
+        [FromForm] decimal[] unitPrices)
+    {
+        try
+        {
+            var realId = _hash.Decode(id);
+            if (realId == null) return BadRequest();
+            var sale = await _uow.Sales.Query()
+                .Include(s => s.Items)
+                .FirstOrDefaultAsync(s => s.Id == realId.Value);
+            if (sale == null) return NotFound();
+
+            if (productIds.Length == 0)
+            {
+                ModelState.AddModelError("", "Add at least one product line.");
+                await PopulateViewBagAsync(); ViewBag.HashId = id;
+                return View(model);
+            }
+
+            // Check stock: effective stock = current stock + old sale quantities returned
+            for (int i = 0; i < productIds.Length; i++)
+            {
+                var pid    = productIds[i];
+                var newQty = quantities[i];
+                var currentStock = await _uow.StockLedger.Query()
+                    .Where(s => s.ProductId == pid)
+                    .SumAsync(s => (decimal?)s.Quantity) ?? 0;
+                var oldQty = sale.Items.Where(it => it.ProductId == pid).Sum(it => it.Quantity);
+                if (currentStock + oldQty < newQty)
+                {
+                    var product = await _uow.Products.GetByIdAsync(pid);
+                    ModelState.AddModelError("", $"Insufficient stock for \"{product?.Name}\" — available: {currentStock + oldQty}");
+                    await PopulateViewBagAsync(); ViewBag.HashId = id;
+                    return View(model);
+                }
+            }
+
+            // Remove old items and stock ledger entries
+            _uow.SaleItems.RemoveRange(sale.Items.ToList());
+            var oldLedger = (await _uow.StockLedger.FindAsync(
+                s => s.MovementType == StockMovementType.Sale && s.ReferenceId == sale.Id)).ToList();
+            _uow.StockLedger.RemoveRange(oldLedger);
+
+            // Update header fields
+            sale.SaleDate   = model.SaleDate;
+            sale.CustomerId = model.CustomerId;
+            sale.Note       = model.Note;
+
+            // Build new items
+            var newItems = new List<SaleItem>();
+            for (int i = 0; i < productIds.Length; i++)
+            {
+                var qty   = quantities[i];
+                var price = unitPrices[i];
+                var item  = new SaleItem
+                {
+                    SaleId    = sale.Id,
+                    ProductId = productIds[i],
+                    Quantity  = qty,
+                    UnitPrice = price,
+                    SubTotal  = qty * price
+                };
+                newItems.Add(item);
+                await _uow.SaleItems.AddAsync(item);
+            }
+            sale.TotalAmount = newItems.Sum(x => x.SubTotal);
+            _uow.Sales.Update(sale);
+            await _uow.SaveChangesAsync();
+
+            foreach (var item in newItems)
+            {
+                await _uow.StockLedger.AddAsync(new StockLedger
+                {
+                    ProductId    = item.ProductId,
+                    Quantity     = -item.Quantity,
+                    MovementType = StockMovementType.Sale,
+                    ReferenceId  = sale.Id,
+                    Note         = $"Sale {sale.InvoiceNo}",
+                    CreatedAt    = DateTime.Now
+                });
+            }
+            await _uow.SaveChangesAsync();
+
+            TempData["Success"] = $"Sale {sale.InvoiceNo} updated.";
+            return RedirectToAction(nameof(Index));
+        }
+        catch (Exception)
+        {
+            ModelState.AddModelError("", "An unexpected error occurred while updating the sale.");
+            await PopulateViewBagAsync(); ViewBag.HashId = id;
+            return View(model);
+        }
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Delete(string id)
+    {
+        try
+        {
+            var realId = _hash.Decode(id);
+            if (realId == null) return Json(new { success = false, message = "Invalid id." });
+            var sale = await _uow.Sales.Query()
+                .Include(s => s.Items)
+                .FirstOrDefaultAsync(s => s.Id == realId.Value);
+            if (sale == null) return Json(new { success = false, message = "Not found." });
+
+            var ledger = (await _uow.StockLedger.FindAsync(
+                s => s.MovementType == StockMovementType.Sale && s.ReferenceId == realId.Value)).ToList();
+            _uow.StockLedger.RemoveRange(ledger);
+            _uow.SaleItems.RemoveRange(sale.Items.ToList());
+            _uow.Sales.Remove(sale);
+            await _uow.SaveChangesAsync();
+            return Json(new { success = true });
+        }
+        catch (Exception)
+        {
+            return Json(new { success = false, message = "An unexpected error occurred." });
+        }
+    }
+
+    [HttpGet]
     public async Task<IActionResult> CustomerList()
     {
         try

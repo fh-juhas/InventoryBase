@@ -26,8 +26,9 @@
         </select>
         <button type="submit" class="btn">Go</button>
       </form>
-      <button id="btnGenerate" class="btn" style="display:none">Generate from templates</button>
-      <button id="btnConfirm"  class="btn btn-primary" style="display:none">Confirm &amp; lock</button>
+      <button id="btnGenerate"    class="btn" style="display:none">Generate from templates</button>
+      <button id="btnAddExpense"  class="btn" style="display:none">+ Add expense</button>
+      <button id="btnConfirm"     class="btn btn-primary" style="display:none">Confirm &amp; lock</button>
     </div>
   </div>
 
@@ -55,6 +56,33 @@
   }
 </div>
 
+<dialog id="addExpenseModal" style="border:1px solid var(--border);border-radius:var(--radius);padding:0;background:var(--surface);color:var(--text);min-width:360px;max-width:440px;width:100%">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border)">
+    <span style="font-weight:600;font-size:14px">Add expense</span>
+    <button type="button" id="closeAddModal" class="btn btn-ghost btn-icon btn-sm" style="line-height:1">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+  <form id="addExpenseForm" style="padding:16px;display:flex;flex-direction:column;gap:12px">
+    <div class="field">
+      <label class="label">Category <span class="req" style="color:var(--danger)">*</span></label>
+      <input class="input" id="addCategory" placeholder="e.g. Rent, Utilities…" required autocomplete="off">
+    </div>
+    <div class="field">
+      <label class="label">Description</label>
+      <input class="input" id="addDescription" placeholder="Optional details" autocomplete="off">
+    </div>
+    <div class="field">
+      <label class="label">Amount (৳) <span class="req" style="color:var(--danger)">*</span></label>
+      <input class="input mono" id="addAmount" type="number" step="0.01" min="0" placeholder="0.00" required>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;padding-top:4px">
+      <button type="button" id="cancelAddExpense" class="btn">Cancel</button>
+      <button type="submit" class="btn btn-primary">Add expense</button>
+    </div>
+  </form>
+</dialog>
+
 @section Scripts {
 <script>
 const MONTH   = @month;
@@ -67,8 +95,9 @@ async function loadSummary() {
     const s = await fetch(`/Expense/MonthSummary?month=${MONTH}&year=${YEAR}`).then(r => r.json());
     document.getElementById('totalAmount').textContent =
       '৳ ' + parseFloat(s.total || 0).toLocaleString('en-BD', { minimumFractionDigits: 2 });
-    document.getElementById('btnGenerate').style.display = s.hasDraft ? 'none' : '';
-    document.getElementById('btnConfirm').style.display  = s.hasDraft ? ''     : 'none';
+    document.getElementById('btnGenerate').style.display   = s.hasDraft ? 'none' : '';
+    document.getElementById('btnAddExpense').style.display  = s.hasDraft ? ''     : 'none';
+    document.getElementById('btnConfirm').style.display     = s.hasDraft ? ''     : 'none';
   } catch(e) { console.error('loadSummary failed', e); }
 }
 loadSummary();
@@ -99,7 +128,20 @@ const table = new Tabulator('#expTable', {
         return moneyFormatter(cell);
       }
     },
-    { title: 'Status', field: 'status', width: 130, formatter: badgeFormatter }
+    { title: 'Status', field: 'status', width: 130, formatter: badgeFormatter },
+    { title: '', field: 'hash', width: 52, hozAlign: 'center', headerSort: false,
+      formatter: (cell) => {
+        if (!cell.getRow().getData().isDraft) return '';
+        const h = cell.getValue();
+        return `<button class="btn btn-ghost btn-icon btn-danger btn-sm" title="Remove"
+          onclick="removeExpense('${h}',event)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+            <path d="M10 11v6"/><path d="M14 11v6"/>
+          </svg></button>`;
+      }
+    }
   ]
 });
 
@@ -168,6 +210,46 @@ async function updateAmount(el) {
     } else { toastr.error('Failed to update amount.'); }
   } catch(e) { toastr.error('Request failed.'); }
 }
+
+// ── Remove a single draft expense ────────────────────────────────────
+async function removeExpense(hash, event) {
+  event.stopPropagation();
+  if (!confirm('Remove this expense item from this month?')) return;
+  try {
+    const d = await apiPost('/Expense/DeleteExpense', { id: hash });
+    if (d.success) {
+      toastr.success('Expense removed.');
+      await table.replaceData();
+      await loadSummary();
+    } else { toastr.error(d.message || 'Failed to remove.'); }
+  } catch(e) { toastr.error('Request failed.'); console.error(e); }
+}
+
+// ── Add expense modal ─────────────────────────────────────────────────
+const addModal = document.getElementById('addExpenseModal');
+document.getElementById('btnAddExpense').addEventListener('click', () => addModal.showModal());
+document.getElementById('closeAddModal').addEventListener('click', () => addModal.close());
+document.getElementById('cancelAddExpense').addEventListener('click', () => addModal.close());
+addModal.addEventListener('click', e => { if (e.target === addModal) addModal.close(); });
+
+document.getElementById('addExpenseForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const category    = document.getElementById('addCategory').value.trim();
+  const description = document.getElementById('addDescription').value.trim();
+  const amount      = parseFloat(document.getElementById('addAmount').value);
+  if (!category || isNaN(amount) || amount < 0) return;
+  try {
+    const d = await apiPost('/Expense/AddExpense',
+      { month: MONTH, year: YEAR, category, description, amount });
+    if (d.success) {
+      toastr.success('Expense added.');
+      addModal.close();
+      document.getElementById('addExpenseForm').reset();
+      await table.replaceData();
+      await loadSummary();
+    } else { toastr.error(d.message || 'Failed to add expense.'); }
+  } catch(e) { toastr.error('Request failed.'); console.error(e); }
+});
 
 // ── Select2 on period pickers ─────────────────────────────────────────
 $('.s2-month').select2({ minimumResultsForSearch: Infinity, width: '130px' });

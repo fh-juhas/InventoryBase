@@ -82,6 +82,20 @@ namespace InventoryBase.Infrastructure.Services
             await _uow.SaveChangesAsync();
         }
 
+        public async Task DeleteExpenseAsync(int expenseId)
+        {
+            var e = await _uow.Expenses.GetByIdAsync(expenseId);
+            if (e == null || e.Status == ExpenseStatus.Confirmed) return;
+            _uow.Expenses.Remove(e);
+            await _uow.SaveChangesAsync();
+        }
+
+        public async Task AddExpenseAsync(Expense expense)
+        {
+            await _uow.Expenses.AddAsync(expense);
+            await _uow.SaveChangesAsync();
+        }
+
         public async Task ConfirmMonthAsync(int month, int year)
         {
             var drafts = await _uow.Expenses.FindAsync(

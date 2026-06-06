@@ -43,7 +43,7 @@ public class DashboardController : Controller
         var lowStockCount  = await _uow.StockLedger.Query()
             .GroupBy(s => s.ProductId)
             .Select(g => new { Qty = g.Sum(x => x.Quantity) })
-            .CountAsync(x => x.Qty > 0 && x.Qty < 10);
+            .CountAsync(x => x.Qty > 0 && x.Qty < 5);
 
         return Json(new
         {
@@ -93,7 +93,7 @@ public class DashboardController : Controller
         var rows = await _uow.StockLedger.Query()
             .GroupBy(s => s.ProductId)
             .Select(g => new { ProductId = g.Key, Qty = g.Sum(x => x.Quantity) })
-            .Where(x => x.Qty < 10 && x.Qty >= 0)
+            .Where(x => x.Qty < 5 && x.Qty >= 0)
             .Join(_uow.Products.Query().Include(p => p.Unit),
                   s => s.ProductId, p => p.Id,
                   (s, p) => new { p.Name, p.SKU, Unit = p.Unit.Name, qty = s.Qty })

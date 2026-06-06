@@ -3,7 +3,11 @@
 <div class="content">
   <div class="page-head">
     <div><h1 class="page-title">@Model.InvoiceNo</h1><div class="page-sub">@Model.PurchaseDate.ToString("dd MMM yyyy") · @Model.Supplier.Name</div></div>
-    <div class="page-actions"><a class="btn" href="@Url.Action("Index","Purchase")">← Back</a></div>
+    <div class="page-actions">
+      <a class="btn" href="@Url.Action("Index","Purchase")">← Back</a>
+      <a class="btn" href="@Url.Action("Edit","Purchase", new { id = ViewBag.HashId })">Edit</a>
+      <button class="btn btn-danger" id="btnDelete">Delete</button>
+    </div>
   </div>
   <div class="split">
     <div class="card">
@@ -38,3 +42,15 @@
     </div>
   </div>
 </div>
+@section Scripts {
+<script>
+document.getElementById('btnDelete').addEventListener('click', async () => {
+  if (!confirm('Delete purchase @Model.InvoiceNo? Stock movements will be reversed.')) return;
+  try {
+    const d = await apiPost('/Purchase/Delete', { id: '@ViewBag.HashId' });
+    if (d.success) { toastr.success('Purchase deleted.'); setTimeout(() => window.location.href = '/Purchase', 800); }
+    else toastr.error(d.message || 'Failed to delete.');
+  } catch(e) { toastr.error('Request failed.'); console.error(e); }
+});
+</script>
+}

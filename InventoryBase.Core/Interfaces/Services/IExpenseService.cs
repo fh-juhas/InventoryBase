@@ -19,6 +19,8 @@ namespace InventoryBase.Core.Interfaces.Services
         Task GenerateFromTemplatesAsync(int month, int year);
         Task<bool> MonthHasDraftAsync(int month, int year);
         Task UpdateAmountAsync(int expenseId, decimal newAmount);
+        Task DeleteExpenseAsync(int expenseId);
+        Task AddExpenseAsync(Expense expense);
         Task ConfirmMonthAsync(int month, int year);
         Task<decimal> GetMonthTotalAsync(int month, int year);
     }

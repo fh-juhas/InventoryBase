@@ -201,6 +201,144 @@ public class PurchaseController : Controller
     }
 
     [HttpGet]
+    public async Task<IActionResult> Edit(string id)
+    {
+        try
+        {
+            var realId = _hash.Decode(id);
+            if (realId == null) return BadRequest();
+            var purchase = await _uow.Purchases.Query()
+                .Include(p => p.Supplier)
+                .Include(p => p.Items).ThenInclude(i => i.Product).ThenInclude(p => p!.Unit)
+                .FirstOrDefaultAsync(p => p.Id == realId.Value);
+            if (purchase == null) return NotFound();
+            await PopulateViewBagAsync();
+            ViewBag.HashId = id;
+            ViewBag.ExistingItems = purchase.Items.Select(i => new
+            {
+                id       = i.ProductId,
+                text     = $"{i.Product!.SKU} — {i.Product.Name}",
+                unit     = i.Product.Unit?.Name ?? "—",
+                qty      = i.Quantity,
+                unitCost = i.UnitCost
+            }).ToList();
+            return View(purchase);
+        }
+        catch (Exception)
+        {
+            TempData["Error"] = "An error occurred loading the purchase.";
+            return RedirectToAction(nameof(Index));
+        }
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Edit(
+        string id,
+        [FromForm] Purchase  model,
+        [FromForm] int[]     productIds,
+        [FromForm] decimal[] quantities,
+        [FromForm] decimal[] unitCosts)
+    {
+        try
+        {
+            var realId = _hash.Decode(id);
+            if (realId == null) return BadRequest();
+            var purchase = await _uow.Purchases.Query()
+                .Include(p => p.Items)
+                .FirstOrDefaultAsync(p => p.Id == realId.Value);
+            if (purchase == null) return NotFound();
+
+            if (productIds.Length == 0)
+            {
+                ModelState.AddModelError("", "Add at least one product line.");
+                await PopulateViewBagAsync(); ViewBag.HashId = id;
+                return View(model);
+            }
+
+            // Remove old items and stock ledger entries
+            _uow.PurchaseItems.RemoveRange(purchase.Items.ToList());
+            var oldLedger = (await _uow.StockLedger.FindAsync(
+                s => s.MovementType == StockMovementType.Purchase && s.ReferenceId == purchase.Id)).ToList();
+            _uow.StockLedger.RemoveRange(oldLedger);
+
+            // Update header fields
+            purchase.PurchaseDate = model.PurchaseDate;
+            purchase.SupplierId   = model.SupplierId;
+            purchase.Note         = model.Note;
+
+            // Build new items
+            var newItems = new List<PurchaseItem>();
+            for (int i = 0; i < productIds.Length; i++)
+            {
+                var qty  = quantities[i];
+                var cost = unitCosts[i];
+                var item = new PurchaseItem
+                {
+                    PurchaseId = purchase.Id,
+                    ProductId  = productIds[i],
+                    Quantity   = qty,
+                    UnitCost   = cost,
+                    SubTotal   = qty * cost
+                };
+                newItems.Add(item);
+                await _uow.PurchaseItems.AddAsync(item);
+            }
+            purchase.TotalAmount = newItems.Sum(x => x.SubTotal);
+            _uow.Purchases.Update(purchase);
+            await _uow.SaveChangesAsync();
+
+            foreach (var item in newItems)
+            {
+                await _uow.StockLedger.AddAsync(new StockLedger
+                {
+                    ProductId    = item.ProductId,
+                    Quantity     = item.Quantity,
+                    MovementType = StockMovementType.Purchase,
+                    ReferenceId  = purchase.Id,
+                    Note         = $"Purchase {purchase.InvoiceNo}",
+                    CreatedAt    = DateTime.Now
+                });
+            }
+            await _uow.SaveChangesAsync();
+
+            TempData["Success"] = $"Purchase {purchase.InvoiceNo} updated.";
+            return RedirectToAction(nameof(Index));
+        }
+        catch (Exception)
+        {
+            ModelState.AddModelError("", "An unexpected error occurred while updating the purchase.");
+            await PopulateViewBagAsync(); ViewBag.HashId = id;
+            return View(model);
+        }
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> Delete(string id)
+    {
+        try
+        {
+            var realId = _hash.Decode(id);
+            if (realId == null) return Json(new { success = false, message = "Invalid id." });
+            var purchase = await _uow.Purchases.Query()
+                .Include(p => p.Items)
+                .FirstOrDefaultAsync(p => p.Id == realId.Value);
+            if (purchase == null) return Json(new { success = false, message = "Not found." });
+
+            var ledger = (await _uow.StockLedger.FindAsync(
+                s => s.MovementType == StockMovementType.Purchase && s.ReferenceId == realId.Value)).ToList();
+            _uow.StockLedger.RemoveRange(ledger);
+            _uow.PurchaseItems.RemoveRange(purchase.Items.ToList());
+            _uow.Purchases.Remove(purchase);
+            await _uow.SaveChangesAsync();
+            return Json(new { success = true });
+        }
+        catch (Exception)
+        {
+            return Json(new { success = false, message = "An unexpected error occurred." });
+        }
+    }
+
+    [HttpGet]
     public async Task<IActionResult> SupplierList()
     {
         try

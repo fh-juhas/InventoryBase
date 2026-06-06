@@ -123,6 +123,43 @@ public class ExpenseController : Controller
         }
     }
 
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteExpense(string id)
+    {
+        try
+        {
+            var realId = _hash.Decode(id);
+            if (realId == null) return Json(new { success = false, message = "Invalid id." });
+            await _expense.DeleteExpenseAsync(realId.Value);
+            return Json(new { success = true });
+        }
+        catch (Exception)
+        {
+            return Json(new { success = false, message = "An unexpected error occurred." });
+        }
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> AddExpense(int month, int year, string category, string? description, decimal amount)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(category))
+                return Json(new { success = false, message = "Category is required." });
+            await _expense.AddExpenseAsync(new Expense
+            {
+                Month = month, Year = year,
+                Category = category, Description = description,
+                Amount = amount, Status = Core.Enums.ExpenseStatus.Draft
+            });
+            return Json(new { success = true });
+        }
+        catch (Exception)
+        {
+            return Json(new { success = false, message = "An unexpected error occurred." });
+        }
+    }
+
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Templates()
     {

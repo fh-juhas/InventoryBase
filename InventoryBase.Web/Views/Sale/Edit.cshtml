@@ -1,4 +1,5 @@
-@{ ViewData["Title"] = "New sale"; ViewData["NavId"] = "sales";
+@model InventoryBase.Core.Entities.Sale
+@{ ViewData["Title"] = "Edit sale"; ViewData["NavId"] = "sales";
    var customers = (IEnumerable<InventoryBase.Core.Entities.Customer>)ViewBag.Customers; }
 @section Styles {
 <style>
@@ -9,10 +10,10 @@
 }
 <div class="content">
   <div class="page-head">
-    <div><h1 class="page-title">New sale</h1></div>
-    <div class="page-actions"><a class="btn" href="@Url.Action("Index","Sale")">Cancel</a></div>
+    <div><h1 class="page-title">Edit @Model.InvoiceNo</h1></div>
+    <div class="page-actions"><a class="btn" href="@Url.Action("Details","Sale", new { id = ViewBag.HashId })">Cancel</a></div>
   </div>
-  <form method="post" asp-controller="Sale" asp-action="Create">
+  <form method="post" asp-controller="Sale" asp-action="Edit" asp-route-id="@ViewBag.HashId">
     @Html.AntiForgeryToken()
     <div class="split">
       <div class="col gap-16">
@@ -20,23 +21,24 @@
           <div class="card-head"><div class="card-title">Sale details</div></div>
           <div class="card-body">
             <div class="form-grid">
-              @* <div class="field"><label class="label">Invoice no.</label><input class="input mono" name="InvoiceNo" placeholder="Auto-generated if blank"/></div> *@
-
-            <input class="input mono" name="InvoiceNo" id="invoiceNo" readonly
-                    placeholder="Generating…" style="background:var(--surface-2);cursor:default;color:var(--muted)" />
-
-              <div class="field"><label class="label">Date <span class="req">*</span></label><input class="input" name="SaleDate" type="date" value="@DateTime.Now.ToString("yyyy-MM-dd")" required/></div>
+              <input class="input mono" value="@Model.InvoiceNo" readonly
+                     style="background:var(--surface-2);cursor:default;color:var(--muted)" />
+              <div class="field"><label class="label">Date <span class="req">*</span></label>
+                <input class="input" name="SaleDate" type="date" value="@Model.SaleDate.ToString("yyyy-MM-dd")" required/>
+              </div>
               <div class="field span-2">
                 <label class="label">Customer <span class="req">*</span></label>
                 <select class="select s2-cus" name="CustomerId" required>
                   <option value="">— Select customer —</option>
                   @foreach (var c in customers) {
                     var cusTxt = string.IsNullOrEmpty(c.Phone) ? c.Name : $"{c.Name} · {c.Phone}";
-                    <option value="@c.Id" data-phone="@c.Phone">@cusTxt</option>
+                    <option value="@c.Id" data-phone="@c.Phone" selected="@(c.Id == Model.CustomerId)">@cusTxt</option>
                   }
                 </select>
               </div>
-              <div class="field span-2"><label class="label">Note</label><textarea class="textarea" name="Note" style="min-height:60px"></textarea></div>
+              <div class="field span-2"><label class="label">Note</label>
+                <textarea class="textarea" name="Note" style="min-height:60px">@Model.Note</textarea>
+              </div>
             </div>
           </div>
         </div>
@@ -60,7 +62,7 @@
             <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:10px;font-weight:600;font-size:15px"><span>Total</span><span id="grandTotal" class="mono">৳ 0.00</span></div>
           </div>
         </div></div>
-        <button type="submit" class="btn btn-primary">Save sale</button>
+        <button type="submit" class="btn btn-primary">Save changes</button>
       </div>
     </div>
   </form>
@@ -69,16 +71,7 @@
 <script>
 let lineIdx = 0;
 
-        // Fetch and lock the invoice number on page load
-        fetch('/Sale/NextInvoiceNo')
-          .then(r => r.json())
-          .then(d => {
-            const el = document.getElementById('invoiceNo');
-            el.value = d.invoiceNo;
-            el.style.color = '';   // restore normal text color
-          });
-
-function addLine() {
+function addLine(preload = null) {
   const idx = lineIdx++;
   const tr  = document.createElement('tr');
   tr.id = `line-${idx}`;
@@ -87,13 +80,13 @@ function addLine() {
     <td><span class="muted" id="unit-${idx}">—</span></td>
     <td><span class="muted mono" id="stock-${idx}">—</span></td>
     <td><input class="input mono" name="quantities" type="number" min="1" step="1" value="1" style="width:80px" onchange="recalc(${idx})"/></td>
-    <td><input class="input mono" name="unitPrices"  type="number" min="0"     step="1"  value="0" id="price-${idx}" style="width:100px" onchange="recalc(${idx})"/></td>
+    <td><input class="input mono" name="unitPrices"  type="number" min="0" step="1"  value="0" id="price-${idx}" style="width:100px" onchange="recalc(${idx})"/></td>
     <td class="mono" id="sub-${idx}">৳ 0</td>
     <td><button type="button" onclick="removeLine(${idx})" class="btn btn-ghost btn-icon btn-sm btn-danger">✕</button></td>
   `;
   document.getElementById('lineBody').appendChild(tr);
 
-  $(`select[data-idx="${idx}"]`).select2({
+  const $sel = $(`select[data-idx="${idx}"]`).select2({
     placeholder: '— Search product —',
     ajax: {
       url: '/Sale/ProductSearch', dataType: 'json', delay: 200,
@@ -108,6 +101,16 @@ function addLine() {
     document.getElementById(`price-${idx}`).value = d.price;
     recalc(idx);
   });
+
+  if (preload) {
+    $sel.append(new Option(preload.text, preload.id, true, true)).trigger('change');
+    document.getElementById(`unit-${idx}`).textContent  = preload.unit || '—';
+    document.getElementById(`stock-${idx}`).textContent = parseFloat(preload.stock||0).toLocaleString('en-BD',{minimumFractionDigits:0});
+    document.getElementById(`line-${idx}`).querySelector('[name=quantities]').value = preload.qty;
+    document.getElementById(`price-${idx}`).value = preload.unitPrice;
+    recalc(idx);
+  }
+
   updateSummary();
 }
 
@@ -142,6 +145,12 @@ $('.s2-cus').select2({
     return $('<span style="line-height:1.6"><span style="font-weight:500">' + name + '</span><br><span style="font-size:11px;color:var(--muted)">' + phone + '</span></span>');
   }
 });
-addLine();
+
+const existingItems = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewBag.ExistingItems));
+if (existingItems && existingItems.length > 0) {
+  existingItems.forEach(item => addLine(item));
+} else {
+  addLine();
+}
 </script>
 }

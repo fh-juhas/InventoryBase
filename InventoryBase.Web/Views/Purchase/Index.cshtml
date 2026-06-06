@@ -23,12 +23,29 @@ const table = new Tabulator('#poTable', {
     { title: 'Date',     field: 'purchaseDate', width: 130, formatter: c => `<span class="muted">${c.getValue()}</span>` },
     { title: 'Total (৳)',field: 'totalAmount',  width: 130, hozAlign: 'right', formatter: moneyFormatter },
     { title: 'Note',     field: 'note',         widthGrow: 2, formatter: c => `<span class="muted">${c.getValue()}</span>` },
-    { title: '', field: 'hash', width: 90, hozAlign: 'right', headerSort: false,
-      formatter: cell => `<a href="/Purchase/Details/${cell.getValue()}" class="btn btn-ghost btn-sm">View</a>`
+    { title: '', field: 'hash', width: 200, hozAlign: 'right', headerSort: false,
+      formatter: cell => {
+        const h = cell.getValue();
+        return `<div style="display:flex;gap:4px;justify-content:flex-end">
+          <a href="/Purchase/Details/${h}" class="btn btn-ghost btn-sm">View</a>
+          <a href="/Purchase/Edit/${h}" class="btn btn-ghost btn-sm">Edit</a>
+          <button class="btn btn-ghost btn-sm btn-danger" onclick="deletePurchase('${h}',event)">Delete</button>
+        </div>`;
+      }
     }
   ]
 });
 table.on('dataProcessed', () => { document.getElementById('rowCount').textContent = table.getDataCount('active') + ' rows'; });
 let deb; document.getElementById('search').addEventListener('input', e => { clearTimeout(deb); deb = setTimeout(() => { filters.search = e.target.value; table.setPage(1); }, 350); });
+
+async function deletePurchase(hash, event) {
+  event.stopPropagation();
+  if (!confirm('Delete this purchase? Stock movements will be reversed.')) return;
+  try {
+    const d = await apiPost('/Purchase/Delete', { id: hash });
+    if (d.success) { toastr.success('Purchase deleted.'); table.replaceData(); }
+    else toastr.error(d.message || 'Failed to delete.');
+  } catch(e) { toastr.error('Request failed.'); console.error(e); }
+}
 </script>
 }
