@@ -1,0 +1,202 @@
+@{
+    Layout = null;
+    var company       = ViewBag.Company as InventoryBase.Core.Entities.CompanySettings;
+    int    rptYear    = (int)ViewBag.Year;
+    int    maxMonth   = (int)ViewBag.MaxMonth;
+    int    empCount   = (int)ViewBag.EmployeeCount;
+    decimal monthlySal = (decimal)ViewBag.MonthlySalary;
+    decimal totSales  = (decimal)ViewBag.TotSales;
+    decimal totPurch  = (decimal)ViewBag.TotPurchases;
+    decimal totExp    = (decimal)ViewBag.TotExpenses;
+    decimal totSal    = (decimal)ViewBag.TotSalaries;
+    decimal totNet    = (decimal)ViewBag.TotNet;
+    string  netColor  = totNet >= 0 ? "#198754" : "#dc3545";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Profit &amp; Loss — @rptYear</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; font-size: 13px; color: #111; background: #e8e8e8; line-height: 1.5; }
+
+  .page-wrap { max-width: 960px; margin: 28px auto; background: #fff; border: 1px solid #ccc; }
+
+  /* header */
+  .inv-header { display:flex; align-items:center; justify-content:space-between; padding:20px 28px 16px; border-bottom:3px solid #0f3460; }
+  .company-name { font-size:17px; font-weight:700; margin-bottom:3px; color:#0f3460; }
+  .company-meta { font-size:12px; color:#444; line-height:1.8; }
+  .company-logo img { max-height:72px; max-width:160px; object-fit:contain; display:block; }
+  .logo-placeholder { width:72px; height:72px; background:#e8eaf0; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:28px; font-weight:700; color:#0f3460; }
+
+  /* title bar */
+  .inv-title-bar { background:#0f3460; color:#fff; display:flex; align-items:center; justify-content:space-between; padding:10px 28px; }
+  .inv-title-bar .title { font-size:15px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
+  .inv-title-bar .sub   { font-size:12px; opacity:.85; }
+
+  /* KPI summary */
+  .kpi-row { display:grid; grid-template-columns:repeat(4,1fr); gap:0; border-bottom:1px solid #ccc; }
+  .kpi-cell { padding:14px 20px; border-right:1px solid #ccc; }
+  .kpi-cell:last-child { border-right:none; }
+  .kpi-lbl  { font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:#888; margin-bottom:4px; }
+  .kpi-val  { font-size:17px; font-weight:700; font-family:'Courier New',monospace; }
+
+  /* note bar */
+  .note-bar { background:#f0f2f7; border-bottom:1px solid #ddd; padding:8px 28px; font-size:11.5px; color:#555; }
+
+  /* table */
+  .tbl-wrap { padding:0 28px 20px; }
+  table.rpt { width:100%; border-collapse:collapse; border:1px solid #ccc; margin-top:16px; }
+  table.rpt th { background:#f0f2f7; padding:8px 10px; font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#444; border:1px solid #ccc; text-align:left; }
+  table.rpt th.r { text-align:right; }
+  table.rpt td { padding:8px 10px; border:1px solid #ddd; vertical-align:middle; }
+  table.rpt td.r { text-align:right; font-family:'Courier New',monospace; }
+  table.rpt tbody tr:nth-child(even) td { background:#fafafa; }
+  table.rpt tbody tr:hover td { background:#f5f7ff; }
+  table.rpt tfoot td { font-weight:700; border-top:2px solid #0f3460; background:#0f3460; color:#fff; padding:9px 10px; }
+  table.rpt tfoot td.r { text-align:right; font-family:'Courier New',monospace; }
+  .profit { color:#198754; font-weight:700; }
+  .loss   { color:#dc3545; font-weight:700; }
+
+  /* footer */
+  .inv-footer { background:#0f3460; color:#fff; display:flex; align-items:center; justify-content:space-between; padding:10px 28px; font-size:11px; margin-top:20px; }
+  .inv-footer .thanks { font-weight:700; font-size:12px; }
+
+  /* print toolbar */
+  .print-toolbar { max-width:960px; margin:16px auto 32px; display:flex; gap:10px; justify-content:center; }
+  .print-toolbar button, .print-toolbar a { padding:9px 26px; border-radius:5px; font-size:13px; font-weight:600; cursor:pointer; text-decoration:none; border:none; display:inline-block; }
+  .btn-print { background:#0f3460; color:#fff; }
+  .btn-back  { background:#dde0e8; color:#333; }
+
+  @@media print {
+    body { background:#fff; }
+    .page-wrap { margin:0; border:none; max-width:100%; }
+    .print-toolbar { display:none; }
+    @@page { size: A4 landscape; margin:8mm; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page-wrap">
+
+  <!-- header -->
+  <div class="inv-header">
+    <div>
+      <div class="company-name">@(company?.CompanyName ?? "Your Company")</div>
+      <div class="company-meta">
+        @if (!string.IsNullOrEmpty(company?.Address)) { <div>@company!.Address</div> }
+        @if (!string.IsNullOrEmpty(company?.Phone))   { <div>Phone: @company!.Phone</div> }
+        @if (!string.IsNullOrEmpty(company?.Email))   { <div>Email: @company!.Email</div> }
+      </div>
+    </div>
+    <div>
+      @if (company != null && !string.IsNullOrEmpty(company.LogoPath))
+      { <img src="@company.LogoPath" alt="logo" style="max-height:72px;max-width:160px;object-fit:contain" /> }
+      else
+      { <div class="logo-placeholder">@((company?.CompanyName ?? "C")[0].ToString().ToUpper())</div> }
+    </div>
+  </div>
+
+  <!-- title bar -->
+  <div class="inv-title-bar">
+    <span class="title">Profit &amp; Loss Statement — @rptYear</span>
+    <span class="sub">@(maxMonth == 12 ? "Full Year" : $"Jan — {new DateTime(rptYear, maxMonth, 1).ToString("MMM")}") &nbsp;|&nbsp; Cash-Flow Basis</span>
+  </div>
+
+  <!-- KPI summary -->
+  <div class="kpi-row">
+    <div class="kpi-cell">
+      <div class="kpi-lbl">Total Revenue</div>
+      <div class="kpi-val" style="color:#0f3460">৳ @totSales.ToString("N2")</div>
+    </div>
+    <div class="kpi-cell">
+      <div class="kpi-lbl">Total Costs</div>
+      <div class="kpi-val" style="color:#dc3545">৳ @((totPurch + totExp + totSal).ToString("N2"))</div>
+    </div>
+    <div class="kpi-cell">
+      <div class="kpi-lbl">Net Profit / Loss</div>
+      <div class="kpi-val" style="color:@netColor">৳ @totNet.ToString("N2")</div>
+    </div>
+    <div class="kpi-cell">
+      <div class="kpi-lbl">Months Covered</div>
+      <div class="kpi-val" style="color:#555">@maxMonth / 12</div>
+    </div>
+  </div>
+
+  <!-- employee note -->
+  <div class="note-bar">
+    Salary column: ৳ @monthlySal.ToString("N2") / month &nbsp;(@empCount active @(empCount == 1 ? "employee" : "employees"))
+    &nbsp;·&nbsp; Only confirmed expenses are included.
+    &nbsp;·&nbsp; Purchase cost = actual invoiced amount (not COGS).
+  </div>
+
+  <!-- month-wise table -->
+  <div class="tbl-wrap">
+    <table class="rpt">
+      <thead>
+        <tr>
+          <th style="width:110px">Month</th>
+          <th class="r">Sales Revenue</th>
+          <th class="r">Purchase Cost</th>
+          <th class="r">Expenses</th>
+          <th class="r">Salaries</th>
+          <th class="r">Total Cost</th>
+          <th class="r">Net Profit / Loss</th>
+        </tr>
+      </thead>
+      <tbody>
+        @if (maxMonth == 0)
+        {
+          <tr><td colspan="7" style="text-align:center;color:#aaa;padding:24px">No data for @rptYear yet.</td></tr>
+        }
+        @foreach (dynamic row in ViewBag.Rows)
+        {
+          decimal net = (decimal)row.net;
+          string rowNetColor = net >= 0 ? "#198754" : "#dc3545";
+          <tr>
+            <td style="font-weight:600">@row.monthName</td>
+            <td class="r">@((decimal)row.sales == 0 ? "—" : "৳ " + ((decimal)row.sales).ToString("N2"))</td>
+            <td class="r" style="color:#dc3545">@((decimal)row.purchases == 0 ? "—" : "৳ " + ((decimal)row.purchases).ToString("N2"))</td>
+            <td class="r" style="color:#dc3545">@((decimal)row.expenses == 0 ? "—" : "৳ " + ((decimal)row.expenses).ToString("N2"))</td>
+            <td class="r" style="color:#dc3545">৳ @((decimal)row.salaries).ToString("N2")</td>
+            <td class="r">৳ @((decimal)row.totalCost).ToString("N2")</td>
+            <td class="r" style="font-weight:700;color:@rowNetColor">@(net < 0 ? "" : "+")৳ @net.ToString("N2")</td>
+          </tr>
+        }
+      </tbody>
+      @if (maxMonth > 0)
+      {
+        string totNetSign = totNet >= 0 ? "+" : "";
+        <tfoot>
+          <tr>
+            <td>TOTAL</td>
+            <td class="r">৳ @totSales.ToString("N2")</td>
+            <td class="r">৳ @totPurch.ToString("N2")</td>
+            <td class="r">৳ @totExp.ToString("N2")</td>
+            <td class="r">৳ @totSal.ToString("N2")</td>
+            <td class="r">৳ @((totPurch + totExp + totSal).ToString("N2"))</td>
+            <td class="r">@totNetSign৳ @totNet.ToString("N2")</td>
+          </tr>
+        </tfoot>
+      }
+    </table>
+  </div>
+
+  <!-- footer -->
+  <div class="inv-footer">
+    <span class="thanks">@(company?.CompanyName ?? "Company") — Confidential</span>
+    <span>Generated: @DateTime.Now.ToString("dd MMM yyyy, hh:mm tt")</span>
+  </div>
+
+</div>
+
+<div class="print-toolbar">
+  <button class="btn-print" onclick="window.print()">Print / Save PDF</button>
+  <a class="btn-back" href="/Report">← Back to Reports</a>
+</div>
+
+</body>
+</html>

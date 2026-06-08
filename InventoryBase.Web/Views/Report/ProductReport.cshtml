@@ -1,0 +1,171 @@
+@{
+    Layout  = null;
+    var company  = ViewBag.Company as InventoryBase.Core.Entities.CompanySettings;
+    string dFrom = ViewBag.DateFrom;
+    string dTo   = ViewBag.DateTo;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Product Inventory Report</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; font-size: 12.5px; color: #111; background: #e8e8e8; line-height: 1.5; }
+
+  .page-wrap { max-width: 1000px; margin: 28px auto; background: #fff; border: 1px solid #ccc; }
+
+  .inv-header { display:flex; align-items:center; justify-content:space-between; padding:20px 28px 16px; border-bottom:3px solid #0f3460; }
+  .company-name { font-size:17px; font-weight:700; margin-bottom:3px; color:#0f3460; }
+  .company-meta { font-size:12px; color:#444; line-height:1.8; }
+  .logo-placeholder { width:72px; height:72px; background:#e8eaf0; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:28px; font-weight:700; color:#0f3460; }
+
+  .inv-title-bar { background:#0f3460; color:#fff; display:flex; align-items:center; justify-content:space-between; padding:10px 28px; }
+  .inv-title-bar .title { font-size:15px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
+  .inv-title-bar .sub   { font-size:12px; opacity:.85; }
+
+  .note-bar { background:#f0f2f7; border-bottom:1px solid #ddd; padding:8px 28px; font-size:11.5px; color:#555; }
+
+  .tbl-wrap { padding:0 28px 20px; }
+  table.rpt { width:100%; border-collapse:collapse; border:1px solid #ccc; margin-top:16px; font-size:12px; }
+  table.rpt th { background:#f0f2f7; padding:7px 8px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#444; border:1px solid #ccc; text-align:left; }
+  table.rpt th.r { text-align:right; }
+  table.rpt th.grp { background:#0f3460; color:#fff; text-align:center; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; border:1px solid #1a4980; }
+  table.rpt td { padding:7px 8px; border:1px solid #e0e0e0; vertical-align:middle; }
+  table.rpt td.r { text-align:right; font-family:'Courier New',monospace; }
+  table.rpt td.c { text-align:center; }
+  table.rpt tbody tr:nth-child(even) td { background:#fafafa; }
+  table.rpt tfoot td { font-weight:700; border-top:2px solid #0f3460; background:#0f3460; color:#fff; padding:8px; }
+  table.rpt tfoot td.r { text-align:right; font-family:'Courier New',monospace; }
+  .sn { color:#999; }
+  .sku-tag { font-size:10.5px; color:#888; font-family:'Courier New',monospace; }
+  .stock-in  { color:#198754; font-weight:600; }
+  .stock-out { color:#dc3545; font-weight:600; }
+  .stock-zero { color:#aaa; }
+
+  .inv-footer { background:#0f3460; color:#fff; display:flex; align-items:center; justify-content:space-between; padding:10px 28px; font-size:11px; margin-top:20px; }
+  .inv-footer .thanks { font-weight:700; font-size:12px; }
+
+  .print-toolbar { max-width:1000px; margin:16px auto 32px; display:flex; gap:10px; justify-content:center; }
+  .print-toolbar button, .print-toolbar a { padding:9px 26px; border-radius:5px; font-size:13px; font-weight:600; cursor:pointer; text-decoration:none; border:none; display:inline-block; }
+  .btn-print { background:#0f3460; color:#fff; }
+  .btn-back  { background:#dde0e8; color:#333; }
+
+  @@media print {
+    body { background:#fff; }
+    .page-wrap { margin:0; border:none; max-width:100%; }
+    .print-toolbar { display:none; }
+    @@page { size: A4 landscape; margin:8mm; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page-wrap">
+
+  <!-- header -->
+  <div class="inv-header">
+    <div>
+      <div class="company-name">@(company?.CompanyName ?? "Your Company")</div>
+      <div class="company-meta">
+        @if (!string.IsNullOrEmpty(company?.Address)) { <div>@company!.Address</div> }
+        @if (!string.IsNullOrEmpty(company?.Phone))   { <div>Phone: @company!.Phone</div> }
+        @if (!string.IsNullOrEmpty(company?.Email))   { <div>Email: @company!.Email</div> }
+      </div>
+    </div>
+    <div>
+      @if (company != null && !string.IsNullOrEmpty(company.LogoPath))
+      { <img src="@company.LogoPath" alt="logo" style="max-height:72px;max-width:160px;object-fit:contain" /> }
+      else
+      { <div class="logo-placeholder">@((company?.CompanyName ?? "C")[0].ToString().ToUpper())</div> }
+    </div>
+  </div>
+
+  <!-- title bar -->
+  <div class="inv-title-bar">
+    <span class="title">Product Inventory Report</span>
+    <span class="sub">Period: @dFrom — @dTo</span>
+  </div>
+
+  <!-- note -->
+  <div class="note-bar">
+    Stock In / Out shows movements within the selected period only. &nbsp;·&nbsp; Current Stock reflects all-time cumulative movements.
+  </div>
+
+  <!-- table -->
+  <div class="tbl-wrap">
+    <table class="rpt">
+      <thead>
+        <tr>
+          <th rowspan="2" style="width:30px" class="r">#</th>
+          <th rowspan="2">Product</th>
+          <th rowspan="2" style="width:90px">Category</th>
+          <th rowspan="2" style="width:60px">Unit</th>
+          <th colspan="2" class="grp">Stock In (Period)</th>
+          <th colspan="2" class="grp">Stock Out (Period)</th>
+          <th rowspan="2" class="r" style="width:100px">Current Stock</th>
+        </tr>
+        <tr>
+          <th class="r" style="width:80px">Qty</th>
+          <th class="r" style="width:100px">Value (৳)</th>
+          <th class="r" style="width:80px">Qty</th>
+          <th class="r" style="width:100px">Value (৳)</th>
+        </tr>
+      </thead>
+      <tbody>
+        @{ int sn = 0; decimal totInQty = 0, totInVal = 0, totOutQty = 0, totOutVal = 0; }
+        @foreach (dynamic row in ViewBag.Rows)
+        {
+          sn++;
+          decimal inQty  = (decimal)row.inQty;
+          decimal inVal  = (decimal)row.inValue;
+          decimal outQty = (decimal)row.outQty;
+          decimal outVal = (decimal)row.outValue;
+          decimal curSt  = (decimal)row.currentStock;
+          totInQty  += inQty; totInVal  += inVal;
+          totOutQty += outQty; totOutVal += outVal;
+          <tr>
+            <td class="r sn">@sn</td>
+            <td>
+              <div style="font-weight:600">@row.name</div>
+              <div class="sku-tag">@row.sku</div>
+            </td>
+            <td style="font-size:11.5px;color:#666">@row.category</td>
+            <td class="c" style="font-size:11.5px;color:#666">@row.unit</td>
+            <td class="r @(inQty > 0 ? "stock-in" : "stock-zero")">@(inQty == 0 ? "—" : inQty.ToString("N3"))</td>
+            <td class="r @(inVal > 0 ? "stock-in" : "stock-zero")">@(inVal == 0 ? "—" : "৳ " + inVal.ToString("N2"))</td>
+            <td class="r @(outQty > 0 ? "stock-out" : "stock-zero")">@(outQty == 0 ? "—" : outQty.ToString("N3"))</td>
+            <td class="r @(outVal > 0 ? "stock-out" : "stock-zero")">@(outVal == 0 ? "—" : "৳ " + outVal.ToString("N2"))</td>
+            <td class="r" style="font-weight:700;color:@(curSt <= 0 ? "#dc3545" : curSt < 10 ? "#e67e22" : "#198754")">@curSt.ToString("N3")</td>
+          </tr>
+        }
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="4">TOTAL</td>
+          <td class="r">@totInQty.ToString("N3")</td>
+          <td class="r">৳ @totInVal.ToString("N2")</td>
+          <td class="r">@totOutQty.ToString("N3")</td>
+          <td class="r">৳ @totOutVal.ToString("N2")</td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <!-- footer -->
+  <div class="inv-footer">
+    <span class="thanks">@(company?.CompanyName ?? "Company") — Confidential</span>
+    <span>Generated: @DateTime.Now.ToString("dd MMM yyyy, hh:mm tt")</span>
+  </div>
+
+</div>
+
+<div class="print-toolbar">
+  <button class="btn-print" onclick="window.print()">Print / Save PDF</button>
+  <a class="btn-back" href="/Report">← Back to Reports</a>
+</div>
+
+</body>
+</html>

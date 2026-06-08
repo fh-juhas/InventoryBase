@@ -6,6 +6,18 @@
 .pl-row:last-child{border-bottom:none}
 .pl-row.total{border-top:2px solid var(--border);font-weight:600;font-size:15px;padding-top:12px;margin-top:4px}
 @@media(max-width:1100px){.report-grid{grid-template-columns:1fr}}
+
+/* detailed reports section */
+.drpt-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+@@media(max-width:900px){.drpt-grid{grid-template-columns:1fr}}
+.drpt-card{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+.drpt-card-title{font-weight:600;font-size:13.5px;margin-bottom:4px}
+.drpt-card-desc{font-size:12px;color:var(--text-2);margin-bottom:12px;line-height:1.6}
+.drpt-controls{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.drpt-controls input[type=date]{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:5px 8px;font-size:12px;color:var(--text);outline:none;height:32px;cursor:pointer}
+.drpt-controls input[type=date]:focus{border-color:var(--border-2)}
+.drpt-controls .lbl{font-size:11.5px;color:var(--text-2);white-space:nowrap}
+.drpt-controls select{height:32px;font-size:12.5px}
 </style>
 }
 <div class="content">
@@ -47,6 +59,73 @@
   <div class="card" style="margin-bottom:16px">
     <div class="card-head"><div class="card-title">Monthly sales trend</div><span class="xs muted">Last 12 months</span></div>
     <div class="card-body"><canvas id="trendChart" style="max-height:240px"></canvas></div>
+  </div>
+
+  <!-- Detailed print reports -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-head">
+      <div class="card-title">Detailed Reports</div>
+      <span class="xs muted">Print-ready — opens in a new tab</span>
+    </div>
+    <div class="card-body">
+      <div class="drpt-grid">
+
+        <!-- P&L Annual -->
+        <div class="drpt-card">
+          <div class="drpt-card-title">Profit &amp; Loss (Annual)</div>
+          <div class="drpt-card-desc">Month-wise breakdown of sales revenue vs purchases, confirmed expenses, and employee salaries for a selected year.</div>
+          <div class="drpt-controls">
+            <span class="lbl">Year</span>
+            <select class="select" id="plDetailYear" style="width:100px">
+              @for (int y = DateTime.Now.Year; y >= DateTime.Now.Year - 4; y--) {
+                <option value="@y" selected="@(y == DateTime.Now.Year)">@y</option>
+              }
+            </select>
+            <button class="btn btn-primary btn-sm" onclick="openPlDetail()">Open Report</button>
+          </div>
+        </div>
+
+        <!-- Product Report -->
+        <div class="drpt-card">
+          <div class="drpt-card-title">Product Inventory Report</div>
+          <div class="drpt-card-desc">Stock in/out quantity and value per product within a date range, plus current total stock level for every active product.</div>
+          <div class="drpt-controls">
+            <span class="lbl">From</span>
+            <input type="date" id="prodFrom" />
+            <span class="lbl">To</span>
+            <input type="date" id="prodTo" />
+            <button class="btn btn-primary btn-sm" onclick="openProductReport()">Open Report</button>
+          </div>
+        </div>
+
+        <!-- Customer Report -->
+        <div class="drpt-card">
+          <div class="drpt-card-title">Customer Revenue Report</div>
+          <div class="drpt-card-desc">Top customers ranked by revenue contribution with percentage share and visual bar for the selected date range.</div>
+          <div class="drpt-controls">
+            <span class="lbl">From</span>
+            <input type="date" id="custFrom" />
+            <span class="lbl">To</span>
+            <input type="date" id="custTo" />
+            <button class="btn btn-primary btn-sm" onclick="openCustomerReport()">Open Report</button>
+          </div>
+        </div>
+
+        <!-- Supplier Report -->
+        <div class="drpt-card">
+          <div class="drpt-card-title">Supplier Purchase Report</div>
+          <div class="drpt-card-desc">Top suppliers ranked by purchase volume with concentration percentage, useful for identifying supply chain dependency.</div>
+          <div class="drpt-controls">
+            <span class="lbl">From</span>
+            <input type="date" id="suppFrom" />
+            <span class="lbl">To</span>
+            <input type="date" id="suppTo" />
+            <button class="btn btn-primary btn-sm" onclick="openSupplierReport()">Open Report</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
   </div>
 </div>
 
@@ -91,6 +170,38 @@ async function loadReports() {
     `).join('');
   }
 }
+
+// ── Detailed reports ───────────────────────────────────────────────────
+(function() {
+  const _pad  = n => String(n).padStart(2, '0');
+  const _fmt  = d => `${d.getFullYear()}-${_pad(d.getMonth()+1)}-${_pad(d.getDate())}`;
+  const _now  = new Date();
+  const _fom  = new Date(_now.getFullYear(), _now.getMonth(), 1);
+  const today = _fmt(_now);
+  const fom   = _fmt(_fom);
+  ['prodFrom','custFrom','suppFrom'].forEach(id => document.getElementById(id).value = fom);
+  ['prodTo','custTo','suppTo'].forEach(id => document.getElementById(id).value = today);
+})();
+
+window.openPlDetail = function() {
+  const y = document.getElementById('plDetailYear').value;
+  window.open(`/Report/ProfitLossDetail?year=${y}`, '_blank');
+};
+window.openProductReport = function() {
+  const f = encodeURIComponent(document.getElementById('prodFrom').value);
+  const t = encodeURIComponent(document.getElementById('prodTo').value);
+  window.open(`/Report/ProductReport?dateFrom=${f}&dateTo=${t}`, '_blank');
+};
+window.openCustomerReport = function() {
+  const f = encodeURIComponent(document.getElementById('custFrom').value);
+  const t = encodeURIComponent(document.getElementById('custTo').value);
+  window.open(`/Report/CustomerReport?dateFrom=${f}&dateTo=${t}`, '_blank');
+};
+window.openSupplierReport = function() {
+  const f = encodeURIComponent(document.getElementById('suppFrom').value);
+  const t = encodeURIComponent(document.getElementById('suppTo').value);
+  window.open(`/Report/SupplierReport?dateFrom=${f}&dateTo=${t}`, '_blank');
+};
 
 // 12-month trend chart
 (async function() {

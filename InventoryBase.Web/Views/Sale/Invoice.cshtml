@@ -1,0 +1,361 @@
+@model InventoryBase.Core.Entities.Sale
+@using InventoryBase.Web.Helpers
+@{
+    Layout = null;
+    var company = ViewBag.Company as InventoryBase.Core.Entities.CompanySettings;
+    string amountWords = AmountToWord.ToWords(Model.TotalAmount);
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Invoice @Model.InvoiceNo</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: Arial, sans-serif;
+    font-size: 13px;
+    color: #111;
+    background: #e8e8e8;
+    line-height: 1.5;
+  }
+
+  .page-wrap {
+    max-width: 800px;
+    margin: 28px auto;
+    background: #fff;
+    border: 1px solid #ccc;
+  }
+
+  /* ── header: white bg, logo right ─────────────────── */
+  .inv-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 28px 16px;
+    border-bottom: 3px solid #0f3460;
+  }
+  .company-info .company-name {
+    font-size: 17px; font-weight: 700; margin-bottom: 3px; color: #0f3460;
+  }
+  .company-info .company-meta {
+    font-size: 12px; color: #444; line-height: 1.8;
+  }
+  .company-logo img {
+    max-height: 72px;
+    max-width: 160px;
+    object-fit: contain;
+    display: block;
+  }
+  .logo-placeholder {
+    width: 72px; height: 72px;
+    background: #e8eaf0;
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; font-weight: 700; color: #0f3460;
+  }
+
+  /* ── invoice title bar ─────────────────────────────── */
+  .inv-title-bar {
+    background: #0f3460;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 28px;
+  }
+  .inv-title-bar .title { font-size: 16px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+  .inv-title-bar .inv-no { font-size: 13px; font-family: 'Courier New', monospace; letter-spacing: .04em; }
+
+  /* ── meta: bill-to + invoice details ──────────────── */
+  .inv-meta {
+    display: flex;
+    border-bottom: 1px solid #ccc;
+  }
+  .meta-half {
+    flex: 1;
+    padding: 14px 28px;
+  }
+  .meta-half:first-child { border-right: 1px solid #ccc; }
+  .meta-lbl {
+    font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .07em;
+    color: #888; margin-bottom: 4px;
+  }
+  .meta-val { font-size: 13px; }
+  .meta-val.bold { font-weight: 700; }
+  .bill-name { font-size: 14px; font-weight: 700; margin-bottom: 2px; }
+  .bill-detail { font-size: 12px; color: #555; line-height: 1.8; }
+  .kv-row { display: flex; gap: 8px; margin-bottom: 6px; }
+  .kv-key { font-size: 11.5px; color: #666; width: 96px; flex-shrink: 0; }
+  .kv-val { font-size: 12px; font-weight: 600; }
+
+  /* ── items table ───────────────────────────────────── */
+  .items-wrap { padding: 0 28px; }
+  .items-wrap .section-lbl {
+    font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .07em;
+    color: #888; padding: 14px 0 6px;
+  }
+  table.items {
+    width: 100%; border-collapse: collapse;
+    border: 1px solid #ccc;
+  }
+  table.items th {
+    background: #f0f2f7;
+    padding: 8px 10px;
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .06em;
+    color: #444; text-align: left;
+    border: 1px solid #ccc;
+  }
+  table.items th.r { text-align: right; }
+  table.items td {
+    padding: 9px 10px;
+    border: 1px solid #ddd;
+    vertical-align: middle;
+  }
+  table.items td.r { text-align: right; font-family: 'Courier New', monospace; }
+  table.items tbody tr:nth-child(even) td { background: #fafafa; }
+  .prod-name { font-weight: 600; }
+  .prod-sku  { font-size: 11px; color: #999; font-family: 'Courier New', monospace; margin-left: 4px; }
+  .sn { color: #999; font-size: 12px; }
+
+  /* ── totals ────────────────────────────────────────── */
+  .totals-wrap {
+    display: flex; justify-content: flex-end;
+    padding: 10px 28px 0;
+  }
+  table.totals {
+    min-width: 260px; border-collapse: collapse;
+    border: 1px solid #ccc;
+  }
+  table.totals td {
+    padding: 7px 12px; font-size: 13px;
+    border-bottom: 1px solid #ddd;
+  }
+  table.totals td:last-child { text-align: right; font-family: 'Courier New', monospace; }
+  table.totals tr.grand td {
+    background: #0f3460; color: #fff;
+    font-weight: 700; font-size: 14px;
+    border-bottom: none;
+  }
+
+  /* ── amount in words ───────────────────────────────── */
+  .amount-words {
+    margin: 12px 28px 0;
+    background: #f0f2f7;
+    border-left: 4px solid #0f3460;
+    padding: 10px 14px;
+    font-size: 12.5px;
+  }
+  .amount-words strong { color: #0f3460; }
+
+  /* ── note ──────────────────────────────────────────── */
+  .note-box {
+    margin: 10px 28px 0;
+    padding: 10px 14px;
+    border: 1px solid #e0c97a;
+    background: #fffdf0;
+    font-size: 12px; color: #5a4000;
+    border-radius: 3px;
+  }
+  .note-box strong { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 2px; color: #7a5900; }
+
+  /* ── signature ─────────────────────────────────────── */
+  .sig-section {
+    margin: 28px 28px 0;
+  }
+  table.sig-table {
+    width: 100%; border: none; border-collapse: collapse;
+  }
+  table.sig-table td {
+    border: none; padding: 0 8px;
+    text-align: center; vertical-align: bottom; width: 33.3%;
+  }
+  .sig-space { height: 52px; }
+  .sig-line { border-top: 1.5px solid #111; margin: 0 12px; }
+  .sig-lbl { font-size: 11.5px; font-weight: 700; margin-top: 5px; }
+  .sig-sub { font-size: 10.5px; color: #888; margin-top: 1px; }
+
+  /* ── footer ────────────────────────────────────────── */
+  .inv-footer {
+    margin-top: 20px;
+    background: #0f3460;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 28px;
+    font-size: 11px;
+  }
+  .inv-footer .thanks { font-weight: 700; font-size: 12px; }
+
+  /* ── print toolbar ─────────────────────────────────── */
+  .print-toolbar {
+    max-width: 800px;
+    margin: 16px auto 32px;
+    display: flex; gap: 10px; justify-content: center;
+  }
+  .print-toolbar button, .print-toolbar a {
+    padding: 9px 26px;
+    border-radius: 5px;
+    font-size: 13px; font-weight: 600;
+    cursor: pointer; text-decoration: none;
+    border: none; display: inline-block;
+  }
+  .btn-print { background: #0f3460; color: #fff; }
+  .btn-back  { background: #dde0e8; color: #333; }
+
+  @@media print {
+    body { background: #fff; }
+    .page-wrap { margin: 0; border: none; max-width: 100%; }
+    .print-toolbar { display: none; }
+    @@page { margin: 8mm; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page-wrap">
+
+  <!-- ══ HEADER: company left, logo right ══ -->
+  <div class="inv-header">
+    <div class="company-info">
+      <div class="company-name">@(company?.CompanyName ?? "Your Company")</div>
+      <div class="company-meta">
+        @if (!string.IsNullOrEmpty(company?.Address)) { <div>@company!.Address</div> }
+        @if (!string.IsNullOrEmpty(company?.Phone))   { <div>Phone: @company!.Phone</div> }
+        @if (!string.IsNullOrEmpty(company?.Email))   { <div>Email: @company!.Email</div> }
+      </div>
+    </div>
+    <div class="company-logo">
+      @if (company != null && !string.IsNullOrEmpty(company.LogoPath))
+      {
+        <img src="@company.LogoPath" alt="@company.CompanyName" />
+      }
+      else
+      {
+        <div class="logo-placeholder">@((company?.CompanyName ?? "C")[0].ToString().ToUpper())</div>
+      }
+    </div>
+  </div>
+
+  <!-- ══ TITLE BAR ══ -->
+  <div class="inv-title-bar">
+    <span class="title">Sales Invoice</span>
+    <span class="inv-no">@Model.InvoiceNo</span>
+  </div>
+
+  <!-- ══ META: Bill To + Invoice Details ══ -->
+  <div class="inv-meta">
+    <div class="meta-half">
+      <div class="meta-lbl">Bill To</div>
+      <div class="bill-name">@Model.Customer.Name</div>
+      <div class="bill-detail">
+        @if (!string.IsNullOrEmpty(Model.Customer.Phone))   { <div>@Model.Customer.Phone</div> }
+        @if (!string.IsNullOrEmpty(Model.Customer.Email))   { <div>@Model.Customer.Email</div> }
+        @if (!string.IsNullOrEmpty(Model.Customer.Address)) { <div>@Model.Customer.Address</div> }
+      </div>
+    </div>
+    <div class="meta-half">
+      <div class="meta-lbl">Invoice Details</div>
+      <div class="kv-row"><span class="kv-key">Invoice No</span><span class="kv-val" style="font-family:'Courier New',monospace">@Model.InvoiceNo</span></div>
+      <div class="kv-row"><span class="kv-key">Date</span><span class="kv-val">@Model.SaleDate.ToString("dd MMM yyyy")</span></div>
+      <div class="kv-row"><span class="kv-key">Total Amount</span><span class="kv-val" style="color:#0f3460;font-family:'Courier New',monospace">৳ @Model.TotalAmount.ToString("N2")</span></div>
+      <div class="kv-row"><span class="kv-key">No. of Items</span><span class="kv-val">@Model.Items.Count</span></div>
+    </div>
+  </div>
+
+  <!-- ══ LINE ITEMS ══ -->
+  <div class="items-wrap">
+    <div class="section-lbl">Line Items</div>
+    <table class="items">
+      <thead>
+        <tr>
+          <th style="width:34px">#</th>
+          <th>Product</th>
+          <th class="r" style="width:88px">Qty</th>
+          <th style="width:58px">Unit</th>
+          <th class="r" style="width:110px">Unit Price</th>
+          <th class="r" style="width:118px">Subtotal</th>
+        </tr>
+      </thead>
+      <tbody>
+        @{ int sn = 0; }
+        @foreach (var item in Model.Items)
+        {
+          sn++;
+          <tr>
+            <td class="sn">@sn</td>
+            <td><span class="prod-name">@item.Product!.Name</span><span class="prod-sku">@item.Product.SKU</span></td>
+            <td class="r">@item.Quantity.ToString("N3")</td>
+            <td style="font-size:12px;color:#666">@(item.Product.Unit?.Name ?? "—")</td>
+            <td class="r">৳ @item.UnitPrice.ToString("N2")</td>
+            <td class="r" style="font-weight:700">৳ @item.SubTotal.ToString("N2")</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ══ TOTALS ══ -->
+  <div class="totals-wrap">
+    <table class="totals">
+      <tr>
+        <td style="color:#666">Subtotal</td>
+        <td>৳ @Model.TotalAmount.ToString("N2")</td>
+      </tr>
+      <tr>
+        <td style="color:#666">Discount</td>
+        <td>৳ 0.00</td>
+      </tr>
+      <tr class="grand">
+        <td>Total Amount</td>
+        <td>৳ @Model.TotalAmount.ToString("N2")</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- ══ AMOUNT IN WORDS ══ -->
+  <div class="amount-words">
+    <strong>In Words:</strong> @amountWords
+  </div>
+
+  <!-- ══ NOTE ══ -->
+  @if (!string.IsNullOrWhiteSpace(Model.Note))
+  {
+    <div class="note-box">
+      <strong>Note</strong>@Model.Note
+    </div>
+  }
+
+  <!-- ══ SIGNATURE ══ -->
+  <div class="sig-section">
+    <table class="sig-table">
+      <tr>
+        <td><div class="sig-space"></div><div class="sig-line"></div><div class="sig-lbl">Prepared By</div><div class="sig-sub">Signature &amp; Date</div></td>
+        <td><div class="sig-space"></div><div class="sig-line"></div><div class="sig-lbl">Authorized By</div><div class="sig-sub">Signature &amp; Stamp</div></td>
+        <td><div class="sig-space"></div><div class="sig-line"></div><div class="sig-lbl">Customer Signature</div><div class="sig-sub">Received in good condition</div></td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- ══ FOOTER ══ -->
+  <div class="inv-footer">
+    <span class="thanks">Thank you for your business!</span>
+    <span>Generated: @DateTime.Now.ToString("dd MMM yyyy, hh:mm tt")</span>
+  </div>
+
+</div>
+
+<!-- ══ PRINT TOOLBAR (hidden on print) ══ -->
+<div class="print-toolbar">
+  <button class="btn-print" onclick="window.print()">Print / Save PDF</button>
+  <a class="btn-back" href="/Sale">← Back to Sales</a>
+</div>
+
+</body>
+</html>

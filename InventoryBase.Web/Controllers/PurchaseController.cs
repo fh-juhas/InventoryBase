@@ -31,6 +31,11 @@ public class PurchaseController : Controller
                 q = q.Where(p => p.InvoiceNo.Contains(req.search) ||
                                  p.Supplier.Name.Contains(req.search));
 
+            if (!string.IsNullOrEmpty(req.dateFrom) && DateTime.TryParse(req.dateFrom, out var dFrom))
+                q = q.Where(p => p.PurchaseDate >= dFrom);
+            if (!string.IsNullOrEmpty(req.dateTo) && DateTime.TryParse(req.dateTo, out var dTo))
+                q = q.Where(p => p.PurchaseDate < dTo.AddDays(1));
+
             q = (req.field, req.dir) switch {
                 ("purchaseDate", "asc")  => q.OrderBy(p => p.PurchaseDate),
                 ("totalAmount",  "asc")  => q.OrderBy(p => p.TotalAmount),

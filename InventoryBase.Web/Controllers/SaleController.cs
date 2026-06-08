@@ -12,11 +12,12 @@ namespace InventoryBase.Web.Controllers;
 [Authorize]
 public class SaleController : Controller
 {
-    private readonly IUnitOfWork  _uow;
-    private readonly IHashService _hash;
+    private readonly IUnitOfWork     _uow;
+    private readonly IHashService    _hash;
+    private readonly ICompanyService _companySvc;
 
-    public SaleController(IUnitOfWork uow, IHashService hash)
-    { _uow = uow; _hash = hash; }
+    public SaleController(IUnitOfWork uow, IHashService hash, ICompanyService companySvc)
+    { _uow = uow; _hash = hash; _companySvc = companySvc; }
 
     public IActionResult Index() => View();
 
@@ -56,6 +57,11 @@ public class SaleController : Controller
             if (!string.IsNullOrWhiteSpace(req.search))
                 q = q.Where(s => s.InvoiceNo.Contains(req.search) ||
                                  s.Customer.Name.Contains(req.search));
+
+            if (!string.IsNullOrEmpty(req.dateFrom) && DateTime.TryParse(req.dateFrom, out var dFrom))
+                q = q.Where(s => s.SaleDate >= dFrom);
+            if (!string.IsNullOrEmpty(req.dateTo) && DateTime.TryParse(req.dateTo, out var dTo))
+                q = q.Where(s => s.SaleDate < dTo.AddDays(1));
 
             q = (req.field, req.dir) switch {
                 ("saleDate",    "asc")  => q.OrderBy(s => s.SaleDate),
@@ -424,6 +430,28 @@ public class SaleController : Controller
         catch (Exception)
         {
             return Json(new List<object>());
+        }
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> Invoice(string id)
+    {
+        try
+        {
+            var realId = _hash.Decode(id);
+            if (realId == null) return BadRequest();
+            var sale = await _uow.Sales.Query()
+                .Include(s => s.Customer)
+                .Include(s => s.Items).ThenInclude(i => i.Product).ThenInclude(p => p!.Unit)
+                .FirstOrDefaultAsync(s => s.Id == realId.Value);
+            if (sale == null) return NotFound();
+            ViewBag.Company = await _companySvc.GetAsync();
+            return View(sale);
+        }
+        catch (Exception)
+        {
+            TempData["Error"] = "An error occurred loading the invoice.";
+            return RedirectToAction(nameof(Index));
         }
     }
 

@@ -13,6 +13,8 @@
         public string? role { get; set; }
         public int? month { get; set; }
         public int? year { get; set; }
+        public string? dateFrom { get; set; }  // yyyy-MM-dd
+        public string? dateTo   { get; set; }  // yyyy-MM-dd
     }
 
     public class TabulatorResponse<T>

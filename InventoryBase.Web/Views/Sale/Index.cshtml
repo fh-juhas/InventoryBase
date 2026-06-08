@@ -1,4 +1,22 @@
 @{ ViewData["Title"] = "Sales"; ViewData["NavId"] = "sales"; }
+<style>
+  .date-range { display:flex; align-items:center; gap:6px; }
+  .date-range label { font-size:12px; color:var(--text-2); white-space:nowrap; }
+  .date-range input[type=date] {
+    background:var(--surface-2); border:1px solid var(--border);
+    border-radius:var(--radius-sm); padding:5px 8px;
+    font-size:12.5px; color:var(--text); outline:none;
+    cursor:pointer; height:32px;
+  }
+  .date-range input[type=date]:focus { border-color:var(--border-2); background:var(--surface); }
+  .btn-clear {
+    padding:5px 10px; font-size:12px; height:32px;
+    background:var(--surface-2); border:1px solid var(--border);
+    border-radius:var(--radius-sm); color:var(--text-2);
+    cursor:pointer; white-space:nowrap;
+  }
+  .btn-clear:hover { border-color:var(--border-2); color:var(--text); }
+</style>
 <div class="content">
   <div class="page-head">
     <div><h1 class="page-title">Sales</h1><div class="page-sub">Sales invoices and revenue history.</div></div>
@@ -7,6 +25,13 @@
   <div class="table-wrap">
     <div class="table-toolbar">
       <div class="search-box"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input id="search" placeholder="Search invoice or customer…"/></div>
+      <div class="date-range">
+        <label for="dateFrom">From</label>
+        <input type="date" id="dateFrom" />
+        <label for="dateTo">To</label>
+        <input type="date" id="dateTo" />
+        <button class="btn-clear" id="btnClearDates" title="Clear date filter">✕ Clear</button>
+      </div>
       <div class="spacer"></div><span class="xs muted" id="rowCount"></span>
     </div>
     <div id="saleTable"></div>
@@ -14,7 +39,14 @@
 </div>
 @section Scripts {
 <script>
-let filters = { search: '' };
+const _pad = n => String(n).padStart(2, '0');
+const _fmt = d => `${d.getFullYear()}-${_pad(d.getMonth()+1)}-${_pad(d.getDate())}`;
+const _today = new Date();
+const _firstOfMonth = new Date(_today.getFullYear(), _today.getMonth(), 1);
+document.getElementById('dateFrom').value = _fmt(_firstOfMonth);
+document.getElementById('dateTo').value   = _fmt(_today);
+
+let filters = { search: '', dateFrom: _fmt(_firstOfMonth), dateTo: _fmt(_today) };
 const table = new Tabulator('#saleTable', {
   ...window.tabulatorDefaults, ajaxURL: '/Sale/Data', ajaxParams: () => ({ ...filters }),
   columns: [
@@ -23,10 +55,11 @@ const table = new Tabulator('#saleTable', {
     { title: 'Date',     field: 'saleDate',    width: 130, formatter: c => `<span class="muted">${c.getValue()}</span>` },
     { title: 'Total (৳)',field: 'totalAmount', width: 130, hozAlign: 'right', formatter: moneyFormatter },
     { title: 'Note',     field: 'note',        widthGrow: 2, formatter: c => `<span class="muted">${c.getValue()}</span>` },
-    { title: '', field: 'hash', width: 200, hozAlign: 'right', headerSort: false,
+    { title: '', field: 'hash', width: 260, hozAlign: 'right', headerSort: false,
       formatter: cell => {
         const h = cell.getValue();
         return `<div style="display:flex;gap:4px;justify-content:flex-end">
+          <a href="/Sale/Invoice/${h}" target="_blank" class="btn btn-ghost btn-sm" title="Print Invoice">Invoice</a>
           <a href="/Sale/Details/${h}" class="btn btn-ghost btn-sm">View</a>
           <a href="/Sale/Edit/${h}" class="btn btn-ghost btn-sm">Edit</a>
           <button class="btn btn-ghost btn-sm btn-danger" onclick="deleteSale('${h}',event)">Delete</button>
@@ -36,7 +69,19 @@ const table = new Tabulator('#saleTable', {
   ]
 });
 table.on('dataProcessed', () => { document.getElementById('rowCount').textContent = table.getDataCount('active') + ' rows'; });
-let deb; document.getElementById('search').addEventListener('input', e => { clearTimeout(deb); deb = setTimeout(() => { filters.search = e.target.value; table.setPage(1); }, 350); });
+
+let deb;
+document.getElementById('search').addEventListener('input', e => {
+  clearTimeout(deb); deb = setTimeout(() => { filters.search = e.target.value; table.setPage(1); }, 350);
+});
+document.getElementById('dateFrom').addEventListener('change', e => { filters.dateFrom = e.target.value; table.setPage(1); });
+document.getElementById('dateTo').addEventListener('change', e => { filters.dateTo = e.target.value; table.setPage(1); });
+document.getElementById('btnClearDates').addEventListener('click', () => {
+  document.getElementById('dateFrom').value = '';
+  document.getElementById('dateTo').value = '';
+  filters.dateFrom = ''; filters.dateTo = '';
+  table.setPage(1);
+});
 
 async function deleteSale(hash, event) {
   event.stopPropagation();

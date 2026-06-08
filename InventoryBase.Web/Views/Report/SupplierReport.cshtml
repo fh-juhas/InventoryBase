@@ -1,0 +1,178 @@
+@{
+    Layout  = null;
+    var company     = ViewBag.Company as InventoryBase.Core.Entities.CompanySettings;
+    string dFrom    = ViewBag.DateFrom;
+    string dTo      = ViewBag.DateTo;
+    decimal totPurch = (decimal)ViewBag.TotalPurchases;
+    int    suppCount = (int)ViewBag.SupplierCount;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Supplier Purchase Report</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; font-size: 13px; color: #111; background: #e8e8e8; line-height: 1.5; }
+
+  .page-wrap { max-width: 800px; margin: 28px auto; background: #fff; border: 1px solid #ccc; }
+
+  .inv-header { display:flex; align-items:center; justify-content:space-between; padding:20px 28px 16px; border-bottom:3px solid #0f3460; }
+  .company-name { font-size:17px; font-weight:700; margin-bottom:3px; color:#0f3460; }
+  .company-meta { font-size:12px; color:#444; line-height:1.8; }
+  .logo-placeholder { width:72px; height:72px; background:#e8eaf0; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:28px; font-weight:700; color:#0f3460; }
+
+  .inv-title-bar { background:#0f3460; color:#fff; display:flex; align-items:center; justify-content:space-between; padding:10px 28px; }
+  .inv-title-bar .title { font-size:15px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
+  .inv-title-bar .sub   { font-size:12px; opacity:.85; }
+
+  .kpi-row { display:grid; grid-template-columns:repeat(3,1fr); border-bottom:1px solid #ccc; }
+  .kpi-cell { padding:14px 20px; border-right:1px solid #ccc; }
+  .kpi-cell:last-child { border-right:none; }
+  .kpi-lbl { font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:#888; margin-bottom:4px; }
+  .kpi-val { font-size:17px; font-weight:700; font-family:'Courier New',monospace; }
+
+  .tbl-wrap { padding:0 28px 20px; }
+  table.rpt { width:100%; border-collapse:collapse; border:1px solid #ccc; margin-top:16px; }
+  table.rpt th { background:#f0f2f7; padding:8px 10px; font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#444; border:1px solid #ccc; text-align:left; }
+  table.rpt th.r { text-align:right; }
+  table.rpt td { padding:9px 10px; border:1px solid #e0e0e0; vertical-align:middle; }
+  table.rpt td.r { text-align:right; font-family:'Courier New',monospace; }
+  table.rpt td.c { text-align:center; }
+  table.rpt tbody tr:nth-child(even) td { background:#fafafa; }
+  table.rpt tfoot td { font-weight:700; border-top:2px solid #0f3460; background:#0f3460; color:#fff; padding:9px 10px; }
+  table.rpt tfoot td.r { text-align:right; font-family:'Courier New',monospace; }
+
+  .rank-badge { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; font-size:11px; font-weight:700; }
+  .rank-1 { background:#f5c518; color:#333; }
+  .rank-2 { background:#9e9e9e; color:#fff; }
+  .rank-3 { background:#cd7f32; color:#fff; }
+  .rank-n { background:#e8eaf0; color:#555; }
+
+  .pct-bar { display:flex; align-items:center; gap:8px; }
+  .pct-track { width:100px; background:#e8eaf0; border-radius:3px; height:8px; flex-shrink:0; }
+  .pct-fill  { background:#0f3460; border-radius:3px; height:8px; }
+  .pct-label { font-size:12px; font-weight:600; color:#0f3460; white-space:nowrap; }
+
+  .inv-footer { background:#0f3460; color:#fff; display:flex; align-items:center; justify-content:space-between; padding:10px 28px; font-size:11px; margin-top:20px; }
+  .inv-footer .thanks { font-weight:700; font-size:12px; }
+
+  .print-toolbar { max-width:800px; margin:16px auto 32px; display:flex; gap:10px; justify-content:center; }
+  .print-toolbar button, .print-toolbar a { padding:9px 26px; border-radius:5px; font-size:13px; font-weight:600; cursor:pointer; text-decoration:none; border:none; display:inline-block; }
+  .btn-print { background:#0f3460; color:#fff; }
+  .btn-back  { background:#dde0e8; color:#333; }
+
+  @@media print {
+    body { background:#fff; }
+    .page-wrap { margin:0; border:none; max-width:100%; }
+    .print-toolbar { display:none; }
+    @@page { margin:10mm; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page-wrap">
+
+  <!-- header -->
+  <div class="inv-header">
+    <div>
+      <div class="company-name">@(company?.CompanyName ?? "Your Company")</div>
+      <div class="company-meta">
+        @if (!string.IsNullOrEmpty(company?.Address)) { <div>@company!.Address</div> }
+        @if (!string.IsNullOrEmpty(company?.Phone))   { <div>Phone: @company!.Phone</div> }
+        @if (!string.IsNullOrEmpty(company?.Email))   { <div>Email: @company!.Email</div> }
+      </div>
+    </div>
+    <div>
+      @if (company != null && !string.IsNullOrEmpty(company.LogoPath))
+      { <img src="@company.LogoPath" alt="logo" style="max-height:72px;max-width:160px;object-fit:contain" /> }
+      else
+      { <div class="logo-placeholder">@((company?.CompanyName ?? "C")[0].ToString().ToUpper())</div> }
+    </div>
+  </div>
+
+  <!-- title bar -->
+  <div class="inv-title-bar">
+    <span class="title">Supplier Purchase Report</span>
+    <span class="sub">Period: @dFrom — @dTo</span>
+  </div>
+
+  <!-- KPI -->
+  <div class="kpi-row">
+    <div class="kpi-cell">
+      <div class="kpi-lbl">Total Purchases</div>
+      <div class="kpi-val" style="color:#0f3460">৳ @totPurch.ToString("N2")</div>
+    </div>
+    <div class="kpi-cell">
+      <div class="kpi-lbl">Active Suppliers</div>
+      <div class="kpi-val" style="color:#555">@suppCount</div>
+    </div>
+    <div class="kpi-cell">
+      <div class="kpi-lbl">Avg Purchase / Supplier</div>
+      <div class="kpi-val" style="color:#555">৳ @(suppCount > 0 ? (totPurch / suppCount).ToString("N2") : "0.00")</div>
+    </div>
+  </div>
+
+  <!-- table -->
+  <div class="tbl-wrap">
+    <table class="rpt">
+      <thead>
+        <tr>
+          <th style="width:36px" class="c">#</th>
+          <th>Supplier</th>
+          <th style="width:120px">Phone</th>
+          <th class="r" style="width:70px">POs</th>
+          <th class="r" style="width:130px">Amount (৳)</th>
+          <th style="width:200px">Concentration</th>
+        </tr>
+      </thead>
+      <tbody>
+        @{ int rank = 0; }
+        @foreach (dynamic row in ViewBag.Rows)
+        {
+          rank++;
+          decimal pct  = (decimal)row.pct;
+          string badge = rank == 1 ? "rank-1" : rank == 2 ? "rank-2" : rank == 3 ? "rank-3" : "rank-n";
+          int barWidth = (int)Math.Min(100, pct);
+          <tr>
+            <td class="c"><span class="rank-badge @badge">@rank</span></td>
+            <td style="font-weight:600">@row.name</td>
+            <td style="font-size:12px;color:#666">@row.phone</td>
+            <td class="r">@row.invoices</td>
+            <td class="r" style="font-weight:700">৳ @((decimal)row.total).ToString("N2")</td>
+            <td>
+              <div class="pct-bar">
+                <div class="pct-track"><div class="pct-fill" style="width:@barWidth%"></div></div>
+                <span class="pct-label">@pct%</span>
+              </div>
+            </td>
+          </tr>
+        }
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="4">TOTAL</td>
+          <td class="r">৳ @totPurch.ToString("N2")</td>
+          <td>100.0%</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <!-- footer -->
+  <div class="inv-footer">
+    <span class="thanks">@(company?.CompanyName ?? "Company") — Confidential</span>
+    <span>Generated: @DateTime.Now.ToString("dd MMM yyyy, hh:mm tt")</span>
+  </div>
+
+</div>
+
+<div class="print-toolbar">
+  <button class="btn-print" onclick="window.print()">Print / Save PDF</button>
+  <a class="btn-back" href="/Report">← Back to Reports</a>
+</div>
+
+</body>
+</html>
