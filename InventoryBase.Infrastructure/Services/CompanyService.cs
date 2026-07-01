@@ -12,7 +12,11 @@ public class CompanyService : ICompanyService
     public CompanyService(IUnitOfWork uow, string webRootPath)
     {
         _uow = uow;
-        _webRootPath = webRootPath;
+        // In production WebRootPath can be null when no wwwroot ships with the
+        // published app. Fall back to <contentRoot>/wwwroot so uploads still work.
+        _webRootPath = string.IsNullOrEmpty(webRootPath)
+            ? Path.Combine(AppContext.BaseDirectory, "wwwroot")
+            : webRootPath;
     }
 
     public async Task<CompanySettings> GetAsync()
@@ -39,10 +43,12 @@ public class CompanyService : ICompanyService
         if (logoStream != null && !string.IsNullOrEmpty(logoFileName))
         {
             var dir = Path.Combine(_webRootPath, "uploads", "logos");
-            Directory.CreateDirectory(dir);
+            Directory.CreateDirectory(dir);  // creates wwwroot/uploads/logos and any missing parents
             var name = $"logo_{Guid.NewGuid()}{Path.GetExtension(logoFileName)}";
-            await using var fileStream = new FileStream(Path.Combine(dir, name), FileMode.Create);
-            await logoStream.CopyToAsync(fileStream);
+            await using (var fileStream = new FileStream(Path.Combine(dir, name), FileMode.Create))
+            {
+                await logoStream.CopyToAsync(fileStream);
+            }
             existing.LogoPath = $"/uploads/logos/{name}";
         }
 

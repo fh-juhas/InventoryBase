@@ -19,6 +19,8 @@ public class AuthController : Controller
     [HttpGet] public IActionResult Register() => View();
     public    IActionResult AccessDenied()    => View();
 
+    //Admin@12345
+
     [HttpPost]
     public async Task<IActionResult> Login(LoginViewModel m)
     {

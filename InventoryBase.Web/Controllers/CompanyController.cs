@@ -9,7 +9,12 @@ namespace InventoryBase.Web.Controllers;
 public class CompanyController : Controller
 {
     private readonly ICompanyService _company;
-    public CompanyController(ICompanyService company) => _company = company;
+    private readonly ILogger<CompanyController> _logger;
+    public CompanyController(ICompanyService company, ILogger<CompanyController> logger)
+    {
+        _company = company;
+        _logger = logger;
+    }
 
     public async Task<IActionResult> Settings()
     {
@@ -17,8 +22,9 @@ public class CompanyController : Controller
         {
             return View(await _company.GetAsync());
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            _logger.LogError(ex, "Failed to load company settings.");
             TempData["Error"] = "An error occurred loading company settings.";
             return RedirectToAction("Index", "Dashboard");
         }
@@ -34,8 +40,9 @@ public class CompanyController : Controller
             TempData["Success"] = "Company settings saved.";
             return RedirectToAction(nameof(Settings));
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            _logger.LogError(ex, "Failed to save company settings (logo file: {FileName})", logoFile?.FileName);
             ModelState.AddModelError("", "An unexpected error occurred while saving company settings. Please try again.");
             return View(model);
         }

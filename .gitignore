@@ -121,3 +121,4 @@ logs/
 *AssemblyInfo*.cs
 *AssemblyInfoInputs*
 /InventoryBase.Web/wwwroot/uploads
+.Claude.md
