@@ -8,6 +8,14 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 var builder = WebApplication.CreateBuilder(args);
 
+// Pin the web root to a known, existing folder. On some hosts (e.g. somee.com)
+// WebRootPath resolves to null when wwwroot isn't detected at startup, which
+// breaks both writing uploads and serving them. Create it and set it explicitly
+// so the upload writer and static-file middleware agree on one location.
+var webRoot = Path.Combine(builder.Environment.ContentRootPath, "wwwroot");
+Directory.CreateDirectory(webRoot);
+builder.Environment.WebRootPath = webRoot;
+
 // ── Database
 builder.Services.AddDbContext<AppDbContext>(o =>
     o.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
