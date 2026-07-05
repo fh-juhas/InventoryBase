@@ -14,6 +14,8 @@ namespace InventoryBase.Core.Entities
         public int UnitID { get; set; }
         public decimal CostPrice { get; set; }
         public decimal SalePrice { get; set; }
+        // Per-product low-stock / reorder threshold. Stock at or below this is "low".
+        public decimal ReorderLevel { get; set; } = 10;
         public string? Description { get; set; }
         public int CategoryId { get; set; }
         public bool IsActive { get; set; } = true;

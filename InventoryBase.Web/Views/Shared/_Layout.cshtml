@@ -75,6 +75,16 @@
         .nav-item.active{background:var(--surface-2);color:var(--text);font-weight:500}
         .nav-item .icon{width:16px;height:16px;flex-shrink:0;opacity:.7}
         .nav-item.active .icon{opacity:1}
+        /* quick-add: nav link + "+" button share one row */
+        .nav-row{position:relative;display:flex;align-items:center}
+        .nav-row .nav-item{flex:1;padding-right:34px}
+        .nav-add{position:absolute;right:6px;top:50%;transform:translateY(-50%);
+          display:flex;align-items:center;justify-content:center;width:22px;height:22px;
+          border-radius:var(--radius-sm);color:var(--muted);text-decoration:none;
+          font-size:16px;line-height:1;opacity:0;transition:opacity .12s,background .12s}
+        .nav-row:hover .nav-add{opacity:1}
+        .nav-add:hover{background:var(--text);color:var(--surface)}
+        @@media(hover:none){.nav-add{opacity:1}}
         .sidebar-footer{margin-top:auto;padding:10px 8px;
           border-top:1px solid var(--border);display:flex;align-items:center;gap:10px}
         .avatar{width:28px;height:28px;border-radius:50%;background:var(--accent-soft);
@@ -267,10 +277,13 @@
             </a>
 
             <div class="sidebar-section">Inventory Management</div>
-            <a class="nav-item @nav("products")" href="@Url.Action("Index","Product")">
-                <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" /></svg>
-                Products
-            </a>
+            <div class="nav-row">
+                <a class="nav-item @nav("products")" href="@Url.Action("Index","Product")">
+                    <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" /></svg>
+                    Products
+                </a>
+                <a class="nav-add" href="@Url.Action("Create","Product")" title="New product" aria-label="New product">+</a>
+            </div>
             <a class="nav-item @nav("categories")" href="@Url.Action("Index","Category")">
                 <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M20 20H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2z" /></svg>
                 Categories
@@ -285,14 +298,20 @@
             </a>
 
             <div class="sidebar-section">Transactions</div>
-            <a class="nav-item @nav("purchases")" href="@Url.Action("Index","Purchase")">
-                <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2" /><circle cx="7" cy="18" r="2" /><circle cx="17" cy="18" r="2" /></svg>
-                Purchases
-            </a>
-            <a class="nav-item @nav("sales")" href="@Url.Action("Index","Sale")">
-                <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z" /></svg>
-                Sales
-            </a>
+            <div class="nav-row">
+                <a class="nav-item @nav("purchases")" href="@Url.Action("Index","Purchase")">
+                    <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2" /><circle cx="7" cy="18" r="2" /><circle cx="17" cy="18" r="2" /></svg>
+                    Purchases
+                </a>
+                <a class="nav-add" href="@Url.Action("Create","Purchase")" title="New purchase" aria-label="New purchase">+</a>
+            </div>
+            <div class="nav-row">
+                <a class="nav-item @nav("sales")" href="@Url.Action("Index","Sale")">
+                    <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z" /></svg>
+                    Sales
+                </a>
+                <a class="nav-add" href="@Url.Action("Create","Sale")" title="New sale" aria-label="New sale">+</a>
+            </div>
 
             <div class="sidebar-section">Directory</div>
             <a class="nav-item @nav("suppliers")" href="@Url.Action("Index","Supplier")">
@@ -316,6 +335,10 @@
             <a class="nav-item @nav("reports")" href="@Url.Action("Index","Report")">
                 <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /></svg>
                 Reports
+            </a>
+            <a class="nav-item @nav("reports-detailed")" href="@Url.Action("Detailed","Report")">
+                <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /><path d="M16 13H8" /><path d="M16 17H8" /><path d="M10 9H8" /></svg>
+                Detailed Reports
             </a>
 
             @if (isAdmin)

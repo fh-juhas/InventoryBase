@@ -46,6 +46,7 @@ namespace InventoryBase.Infrastructure.Data
             {
                 e.Property(p => p.CostPrice).HasPrecision(18, 2);
                 e.Property(p => p.SalePrice).HasPrecision(18, 2);
+                e.Property(p => p.ReorderLevel).HasPrecision(18, 3).HasDefaultValue(10m);
             });
 
             builder.Entity<Purchase>()

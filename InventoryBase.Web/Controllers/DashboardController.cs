@@ -42,8 +42,11 @@ public class DashboardController : Controller
         var activeProducts = await _uow.Products.Query().CountAsync(p => p.IsActive);
         var lowStockCount  = await _uow.StockLedger.Query()
             .GroupBy(s => s.ProductId)
-            .Select(g => new { Qty = g.Sum(x => x.Quantity) })
-            .CountAsync(x => x.Qty > 0 && x.Qty < 5);
+            .Select(g => new { ProductId = g.Key, Qty = g.Sum(x => x.Quantity) })
+            .Join(_uow.Products.Query().Where(p => p.IsActive),
+                  s => s.ProductId, p => p.Id,
+                  (s, p) => new { s.Qty, p.ReorderLevel })
+            .CountAsync(x => x.Qty > 0 && x.Qty <= x.ReorderLevel);
 
         return Json(new
         {
@@ -93,10 +96,10 @@ public class DashboardController : Controller
         var rows = await _uow.StockLedger.Query()
             .GroupBy(s => s.ProductId)
             .Select(g => new { ProductId = g.Key, Qty = g.Sum(x => x.Quantity) })
-            .Where(x => x.Qty < 5 && x.Qty >= 0)
             .Join(_uow.Products.Query().Include(p => p.Unit),
                   s => s.ProductId, p => p.Id,
-                  (s, p) => new { p.Name, p.SKU, Unit = p.Unit.Name, qty = s.Qty })
+                  (s, p) => new { p.Name, p.SKU, Unit = p.Unit.Name, qty = s.Qty, reorderLevel = p.ReorderLevel })
+            .Where(x => x.qty >= 0 && x.qty <= x.reorderLevel)
             .OrderBy(x => x.qty)
             .Take(8)
             .ToListAsync();

@@ -95,9 +95,13 @@ async function loadSummary() {
     const s = await fetch(`/Expense/MonthSummary?month=${MONTH}&year=${YEAR}`).then(r => r.json());
     document.getElementById('totalAmount').textContent =
       '৳ ' + parseFloat(s.total || 0).toLocaleString('en-BD', { minimumFractionDigits: 2 });
+    // "Generate from templates" is a convenience only shown before any draft exists.
     document.getElementById('btnGenerate').style.display   = s.hasDraft ? 'none' : '';
-    document.getElementById('btnAddExpense').style.display  = s.hasDraft ? ''     : 'none';
-    document.getElementById('btnConfirm').style.display     = s.hasDraft ? ''     : 'none';
+    // "Add expense" must always be available (unless the month is locked) so users
+    // who don't use templates can still add expenses — this creates the first draft.
+    document.getElementById('btnAddExpense').style.display = s.locked ? 'none' : '';
+    // "Confirm & lock" only makes sense once there's at least one draft to confirm.
+    document.getElementById('btnConfirm').style.display    = s.hasDraft ? ''     : 'none';
   } catch(e) { console.error('loadSummary failed', e); }
 }
 loadSummary();

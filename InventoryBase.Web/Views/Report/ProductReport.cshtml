@@ -123,6 +123,7 @@
           decimal outQty = (decimal)row.outQty;
           decimal outVal = (decimal)row.outValue;
           decimal curSt  = (decimal)row.currentStock;
+          decimal reorder = (decimal)row.reorderLevel;
           totInQty  += inQty; totInVal  += inVal;
           totOutQty += outQty; totOutVal += outVal;
           <tr>
@@ -137,7 +138,7 @@
             <td class="r @(inVal > 0 ? "stock-in" : "stock-zero")">@(inVal == 0 ? "—" : "৳ " + inVal.ToString("N2"))</td>
             <td class="r @(outQty > 0 ? "stock-out" : "stock-zero")">@(outQty == 0 ? "—" : outQty.ToString("N3"))</td>
             <td class="r @(outVal > 0 ? "stock-out" : "stock-zero")">@(outVal == 0 ? "—" : "৳ " + outVal.ToString("N2"))</td>
-            <td class="r" style="font-weight:700;color:@(curSt <= 0 ? "#dc3545" : curSt < 10 ? "#e67e22" : "#198754")">@curSt.ToString("N3")</td>
+            <td class="r" style="font-weight:700;color:@(curSt <= 0 ? "#dc3545" : curSt <= reorder ? "#e67e22" : "#198754")">@curSt.ToString("N3")</td>
           </tr>
         }
       </tbody>

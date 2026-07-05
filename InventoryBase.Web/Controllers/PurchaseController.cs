@@ -360,6 +360,37 @@ public class PurchaseController : Controller
         }
     }
 
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> QuickAddSupplier(string name, string? phone, string? contactPerson, string? email, string? address)
+    {
+        try
+        {
+            name = name?.Trim() ?? "";
+            if (string.IsNullOrEmpty(name))
+                return Json(new { ok = false, message = "Name is required." });
+
+            var supplier = new Supplier
+            {
+                Name = name,
+                Phone = string.IsNullOrWhiteSpace(phone) ? null : phone.Trim(),
+                ContactPerson = string.IsNullOrWhiteSpace(contactPerson) ? null : contactPerson.Trim(),
+                Email = string.IsNullOrWhiteSpace(email) ? null : email.Trim(),
+                Address = string.IsNullOrWhiteSpace(address) ? null : address.Trim(),
+                IsActive = true,
+                CreatedAt = DateTime.Now
+            };
+            await _uow.Suppliers.AddAsync(supplier);
+            await _uow.SaveChangesAsync();
+
+            var text = string.IsNullOrEmpty(supplier.Phone) ? supplier.Name : $"{supplier.Name} · {supplier.Phone}";
+            return Json(new { ok = true, id = supplier.Id, text, name = supplier.Name, phone = supplier.Phone ?? "" });
+        }
+        catch (Exception)
+        {
+            return Json(new { ok = false, message = "Failed to add supplier." });
+        }
+    }
+
     [HttpGet]
     public async Task<IActionResult> ProductSearch(string q)
     {

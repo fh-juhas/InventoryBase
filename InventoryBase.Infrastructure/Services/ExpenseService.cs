@@ -41,6 +41,15 @@ namespace InventoryBase.Infrastructure.Services
         public async Task<bool> MonthHasDraftAsync(int month, int year) =>
             await _uow.Expenses.Query().AnyAsync(e => e.Month == month && e.Year == year);
 
+        // Locked = month has expenses AND none are still Draft (all Confirmed).
+        public async Task<bool> MonthIsLockedAsync(int month, int year)
+        {
+            var any = await _uow.Expenses.Query().AnyAsync(e => e.Month == month && e.Year == year);
+            if (!any) return false;
+            return !await _uow.Expenses.Query()
+                .AnyAsync(e => e.Month == month && e.Year == year && e.Status == ExpenseStatus.Draft);
+        }
+
         // Carry-forward: uses last month's confirmed amounts; falls back to template defaults
         public async Task GenerateFromTemplatesAsync(int month, int year)
         {

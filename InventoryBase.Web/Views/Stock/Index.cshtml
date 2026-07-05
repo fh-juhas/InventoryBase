@@ -18,7 +18,7 @@
       <select class="select" id="filterStatus" style="width:160px">
         <option value="">All stock levels</option>
         <option value="in stock">In stock</option>
-        <option value="low">Low stock (&lt;10)</option>
+        <option value="low">Low stock</option>
         <option value="out">Out of stock</option>
       </select>
       <div class="spacer"></div><span class="xs muted" id="rowCount"></span>
@@ -54,7 +54,8 @@ const table = new Tabulator('#stockTable', {
     { title: 'Qty',       field: 'qty',      width: 90,    hozAlign: 'right',
       formatter: c => {
         const v = parseFloat(c.getValue());
-        const cls = v <= 0 ? 'danger' : v < 10 ? 'warning' : 'success';
+        const reorder = parseFloat(c.getRow().getData().reorderLevel ?? 10);
+        const cls = v <= 0 ? 'danger' : v <= reorder ? 'warning' : 'success';
         return `<span class="bold" style="color:var(--${cls})">${v.toLocaleString('en-BD',{minimumFractionDigits:0})}</span>`;
       }
     },

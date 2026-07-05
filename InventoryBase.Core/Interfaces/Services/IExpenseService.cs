@@ -18,6 +18,8 @@ namespace InventoryBase.Core.Interfaces.Services
         Task<IEnumerable<Expense>> GetMonthAsync(int month, int year);
         Task GenerateFromTemplatesAsync(int month, int year);
         Task<bool> MonthHasDraftAsync(int month, int year);
+        // True when the month has expenses and every one is Confirmed (i.e. locked).
+        Task<bool> MonthIsLockedAsync(int month, int year);
         Task UpdateAmountAsync(int expenseId, decimal newAmount);
         Task DeleteExpenseAsync(int expenseId);
         Task AddExpenseAsync(Expense expense);

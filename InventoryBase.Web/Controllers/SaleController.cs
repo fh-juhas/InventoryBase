@@ -403,6 +403,36 @@ public class SaleController : Controller
         }
     }
 
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> QuickAddCustomer(string name, string? phone, string? email, string? address)
+    {
+        try
+        {
+            name = name?.Trim() ?? "";
+            if (string.IsNullOrEmpty(name))
+                return Json(new { ok = false, message = "Name is required." });
+
+            var customer = new Customer
+            {
+                Name = name,
+                Phone = phone?.Trim() ?? "",
+                Email = string.IsNullOrWhiteSpace(email) ? null : email.Trim(),
+                Address = string.IsNullOrWhiteSpace(address) ? null : address.Trim(),
+                IsActive = true,
+                CreatedAt = DateTime.Now
+            };
+            await _uow.Customers.AddAsync(customer);
+            await _uow.SaveChangesAsync();
+
+            var text = string.IsNullOrEmpty(customer.Phone) ? customer.Name : $"{customer.Name} · {customer.Phone}";
+            return Json(new { ok = true, id = customer.Id, text, name = customer.Name, phone = customer.Phone });
+        }
+        catch (Exception)
+        {
+            return Json(new { ok = false, message = "Failed to add customer." });
+        }
+    }
+
     [HttpGet]
     public async Task<IActionResult> ProductSearch(string q)
     {

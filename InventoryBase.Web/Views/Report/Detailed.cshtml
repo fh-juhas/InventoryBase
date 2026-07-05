@@ -1,0 +1,155 @@
+@{ ViewData["Title"] = "Detailed Reports"; ViewData["NavId"] = "reports-detailed"; }
+@section Styles {
+<style>
+.rpt-picker{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:18px}
+.rpt-opt{flex:1;min-width:200px;position:relative}
+.rpt-opt input{position:absolute;opacity:0;pointer-events:none}
+.rpt-opt label{display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--border);
+  border-radius:var(--radius);background:var(--surface-2);cursor:pointer;font-size:13.5px;font-weight:500;
+  transition:border-color .12s,background .12s}
+.rpt-opt label:hover{border-color:var(--border-2)}
+.rpt-opt input:checked + label{border-color:var(--text);background:var(--surface);box-shadow:0 0 0 2px var(--surface-2)}
+.rpt-opt .radio-dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--border-2);flex-shrink:0;display:grid;place-items:center}
+.rpt-opt input:checked + label .radio-dot{border-color:var(--text)}
+.rpt-opt input:checked + label .radio-dot::after{content:"";width:8px;height:8px;border-radius:50%;background:var(--text)}
+.rpt-opt .desc{font-size:11.5px;color:var(--text-2);font-weight:400;margin-top:2px;line-height:1.5}
+.rpt-panel{display:none}
+.rpt-panel.active{display:block}
+.rpt-controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.rpt-controls input[type=date]{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 9px;font-size:12.5px;color:var(--text);outline:none;height:34px;cursor:pointer}
+.rpt-controls input[type=date]:focus{border-color:var(--border-2)}
+.rpt-controls .lbl{font-size:12px;color:var(--text-2);white-space:nowrap}
+.rpt-controls select{height:34px;font-size:13px}
+</style>
+}
+<div class="content">
+  <div class="page-head">
+    <div><h1 class="page-title">Detailed Reports</h1><div class="page-sub">Print-ready reports — opens in a new tab.</div></div>
+    <div class="page-actions"><a class="btn" href="@Url.Action("Index","Report")">← Back to Reports</a></div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <!-- radio picker -->
+      <div class="rpt-picker">
+        <div class="rpt-opt">
+          <input type="radio" name="rpt" id="rpt-pl" value="pl" checked>
+          <label for="rpt-pl"><span class="radio-dot"></span>
+            <span>Profit &amp; Loss (Monthly)<span class="desc">Revenue vs. purchases, expenses &amp; salaries for a month.</span></span>
+          </label>
+        </div>
+        <div class="rpt-opt">
+          <input type="radio" name="rpt" id="rpt-prod" value="prod">
+          <label for="rpt-prod"><span class="radio-dot"></span>
+            <span>Product Inventory<span class="desc">Stock in/out qty &amp; value per product.</span></span>
+          </label>
+        </div>
+        <div class="rpt-opt">
+          <input type="radio" name="rpt" id="rpt-cust" value="cust">
+          <label for="rpt-cust"><span class="radio-dot"></span>
+            <span>Customer Revenue<span class="desc">Top customers by revenue share.</span></span>
+          </label>
+        </div>
+        <div class="rpt-opt">
+          <input type="radio" name="rpt" id="rpt-supp" value="supp">
+          <label for="rpt-supp"><span class="radio-dot"></span>
+            <span>Supplier Purchases<span class="desc">Top suppliers by purchase volume.</span></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- P&L Monthly -->
+      <div class="rpt-panel active" data-panel="pl">
+        <div class="rpt-controls">
+          <span class="lbl">Month</span>
+          <select class="select" id="plDetailMonth" style="width:130px">
+            @{ var plMonths = System.Globalization.CultureInfo.InvariantCulture.DateTimeFormat.MonthNames.Take(12).ToArray(); }
+            @for (int m = 1; m <= 12; m++) {
+              <option value="@m" selected="@(m == DateTime.Now.Month)">@plMonths[m-1]</option>
+            }
+          </select>
+          <span class="lbl">Year</span>
+          <select class="select" id="plDetailYear" style="width:100px">
+            @for (int y = DateTime.Now.Year; y >= DateTime.Now.Year - 4; y--) {
+              <option value="@y" selected="@(y == DateTime.Now.Year)">@y</option>
+            }
+          </select>
+          <button class="btn btn-primary" onclick="openPlDetail()">Open Report</button>
+        </div>
+      </div>
+
+      <!-- Product -->
+      <div class="rpt-panel" data-panel="prod">
+        <div class="rpt-controls">
+          <span class="lbl">From</span><input type="date" id="prodFrom" />
+          <span class="lbl">To</span><input type="date" id="prodTo" />
+          <button class="btn btn-primary" onclick="openProductReport()">Open Report</button>
+        </div>
+      </div>
+
+      <!-- Customer -->
+      <div class="rpt-panel" data-panel="cust">
+        <div class="rpt-controls">
+          <span class="lbl">From</span><input type="date" id="custFrom" />
+          <span class="lbl">To</span><input type="date" id="custTo" />
+          <button class="btn btn-primary" onclick="openCustomerReport()">Open Report</button>
+        </div>
+      </div>
+
+      <!-- Supplier -->
+      <div class="rpt-panel" data-panel="supp">
+        <div class="rpt-controls">
+          <span class="lbl">From</span><input type="date" id="suppFrom" />
+          <span class="lbl">To</span><input type="date" id="suppTo" />
+          <button class="btn btn-primary" onclick="openSupplierReport()">Open Report</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+@section Scripts {
+<script>
+// ── Radio → panel toggle ───────────────────────────────────────────────
+document.querySelectorAll('input[name="rpt"]').forEach(r => {
+  r.addEventListener('change', () => {
+    document.querySelectorAll('.rpt-panel').forEach(p => p.classList.remove('active'));
+    document.querySelector(`.rpt-panel[data-panel="${r.value}"]`).classList.add('active');
+  });
+});
+
+// ── Default date ranges (this month → today) ───────────────────────────
+(function() {
+  const pad = n => String(n).padStart(2, '0');
+  const fmt = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const now = new Date();
+  const fom = fmt(new Date(now.getFullYear(), now.getMonth(), 1));
+  const today = fmt(now);
+  ['prodFrom','custFrom','suppFrom'].forEach(id => document.getElementById(id).value = fom);
+  ['prodTo','custTo','suppTo'].forEach(id => document.getElementById(id).value = today);
+})();
+
+window.openPlDetail = function() {
+  const m = document.getElementById('plDetailMonth').value;
+  const y = document.getElementById('plDetailYear').value;
+  window.open(`/Report/ProfitLossDetail?month=${m}&year=${y}`, '_blank');
+};
+window.openProductReport = function() {
+  const f = encodeURIComponent(document.getElementById('prodFrom').value);
+  const t = encodeURIComponent(document.getElementById('prodTo').value);
+  window.open(`/Report/ProductReport?dateFrom=${f}&dateTo=${t}`, '_blank');
+};
+window.openCustomerReport = function() {
+  const f = encodeURIComponent(document.getElementById('custFrom').value);
+  const t = encodeURIComponent(document.getElementById('custTo').value);
+  window.open(`/Report/CustomerReport?dateFrom=${f}&dateTo=${t}`, '_blank');
+};
+window.openSupplierReport = function() {
+  const f = encodeURIComponent(document.getElementById('suppFrom').value);
+  const t = encodeURIComponent(document.getElementById('suppTo').value);
+  window.open(`/Report/SupplierReport?dateFrom=${f}&dateTo=${t}`, '_blank');
+};
+</script>
+}

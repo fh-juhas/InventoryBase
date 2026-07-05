@@ -70,12 +70,13 @@ public class ExpenseController : Controller
         try
         {
             bool hasDraft = await _expense.MonthHasDraftAsync(month, year);
+            bool locked   = await _expense.MonthIsLockedAsync(month, year);
             decimal total = await _expense.GetMonthTotalAsync(month, year);
-            return Json(new { hasDraft, total });
+            return Json(new { hasDraft, locked, total });
         }
         catch (Exception)
         {
-            return Json(new { hasDraft = false, total = 0 });
+            return Json(new { hasDraft = false, locked = false, total = 0 });
         }
     }
 

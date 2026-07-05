@@ -17,6 +17,9 @@ public class ReportController : Controller
 
     public IActionResult Index() => View();
 
+    // ── Detailed reports hub (radio-selected print reports) ──────────────
+    public IActionResult Detailed() => View();
+
     // ── P&L summary for a month/year ────────────────────────────────────
     [HttpGet]
     public async Task<IActionResult> ProfitLoss(int month, int year)
@@ -125,7 +128,7 @@ public class ReportController : Controller
                     category = p.Category?.Name ?? "—",
                     qty      = qty,
                     value    = qty * p.CostPrice,
-                    status   = qty <= 0 ? "out" : qty < 10 ? "low" : "ok"
+                    status   = qty <= 0 ? "out" : qty <= p.ReorderLevel ? "low" : "ok"
                 };
             })
             .OrderBy(r => r.qty)
@@ -134,68 +137,92 @@ public class ReportController : Controller
         return Json(rows);
     }
 
-    // ── Detailed P&L: month-wise for a year ──────────────────────────────
+    // ── Stock alerts: low & out-of-stock products (admin action list) ────
+    // "out" = qty <= 0; "low" = qty at or below the product's own ReorderLevel.
     [HttpGet]
-    public async Task<IActionResult> ProfitLossDetail(int? year)
+    public async Task<IActionResult> StockAlerts()
     {
-        var y         = year ?? DateTime.Now.Year;
+        var stockMap = await _uow.StockLedger.Query()
+            .GroupBy(s => s.ProductId)
+            .Select(g => new { ProductId = g.Key, Qty = g.Sum(x => x.Quantity) })
+            .ToListAsync();
+
+        var products = await _uow.Products.Query()
+            .Include(p => p.Unit)
+            .Where(p => p.IsActive)
+            .ToListAsync();
+
+        var rows = products
+            .Select(p => {
+                var qty = stockMap.FirstOrDefault(s => s.ProductId == p.Id)?.Qty ?? 0;
+                return new {
+                    name         = p.Name,
+                    sku          = p.SKU,
+                    unit         = p.Unit?.Name ?? "",
+                    qty          = qty,
+                    reorderLevel = p.ReorderLevel,
+                    status       = qty <= 0 ? "out" : "low"
+                };
+            })
+            .Where(r => r.qty <= r.reorderLevel)   // out (<=0) and low (<= reorder level)
+            .OrderBy(r => r.qty)                     // most critical first
+            .ToList();
+
+        return Json(new
+        {
+            outCount = rows.Count(r => r.status == "out"),
+            lowCount = rows.Count(r => r.status == "low"),
+            items    = rows
+        });
+    }
+
+    // ── Detailed P&L: single month ───────────────────────────────────────
+    [HttpGet]
+    public async Task<IActionResult> ProfitLossDetail(int? month, int? year)
+    {
+        var y = year  ?? DateTime.Now.Year;
+        var m = month ?? DateTime.Now.Month;
+        if (m < 1 || m > 12) m = DateTime.Now.Month;
+
         var company   = await _companySvc.GetAsync();
         var employees = await _uow.Employees.Query().Where(e => e.IsActive).ToListAsync();
         var monthlySalary = employees.Sum(e => e.Salary);
-        var maxMonth  = y < DateTime.Now.Year ? 12 : (y == DateTime.Now.Year ? DateTime.Now.Month : 0);
 
-        var yearStart = new DateTime(y, 1, 1);
-        var yearEnd   = new DateTime(y + 1, 1, 1);
+        var monthStart = new DateTime(y, m, 1);
+        var monthEnd   = monthStart.AddMonths(1);
 
-        var salesByMonth = await _uow.Sales.Query()
-            .Where(s => s.SaleDate >= yearStart && s.SaleDate < yearEnd)
-            .GroupBy(s => s.SaleDate.Month)
-            .Select(g => new { Month = g.Key, Total = g.Sum(x => x.TotalAmount) })
-            .ToListAsync();
+        var sales = await _uow.Sales.Query()
+            .Where(s => s.SaleDate >= monthStart && s.SaleDate < monthEnd)
+            .SumAsync(s => (decimal?)s.TotalAmount) ?? 0;
 
-        var purchByMonth = await _uow.Purchases.Query()
-            .Where(p => p.PurchaseDate >= yearStart && p.PurchaseDate < yearEnd)
-            .GroupBy(p => p.PurchaseDate.Month)
-            .Select(g => new { Month = g.Key, Total = g.Sum(x => x.TotalAmount) })
-            .ToListAsync();
+        var purchases = await _uow.Purchases.Query()
+            .Where(p => p.PurchaseDate >= monthStart && p.PurchaseDate < monthEnd)
+            .SumAsync(p => (decimal?)p.TotalAmount) ?? 0;
 
-        var expByMonth = await _uow.Expenses.Query()
-            .Where(e => e.Year == y && e.Status == Core.Enums.ExpenseStatus.Confirmed)
-            .GroupBy(e => e.Month)
-            .Select(g => new { Month = g.Key, Total = g.Sum(x => x.Amount) })
-            .ToListAsync();
+        var expenses = await _uow.Expenses.Query()
+            .Where(e => e.Year == y && e.Month == m && e.Status == Core.Enums.ExpenseStatus.Confirmed)
+            .SumAsync(e => (decimal?)e.Amount) ?? 0;
 
-        var rows = new List<object>();
-        decimal totSales = 0, totPurchases = 0, totExpenses = 0, totSalaries = 0, totNet = 0;
+        var totalCost = purchases + expenses + monthlySalary;
+        var net       = sales - totalCost;
 
-        for (int m = 1; m <= maxMonth; m++)
-        {
-            var sales     = salesByMonth.FirstOrDefault(x => x.Month == m)?.Total ?? 0;
-            var purchases = purchByMonth.FirstOrDefault(x => x.Month == m)?.Total ?? 0;
-            var expenses  = expByMonth.FirstOrDefault(x => x.Month == m)?.Total ?? 0;
-            var totalCost = purchases + expenses + monthlySalary;
-            var net       = sales - totalCost;
-
-            totSales     += sales;
-            totPurchases += purchases;
-            totExpenses  += expenses;
-            totSalaries  += monthlySalary;
-            totNet       += net;
-
-            rows.Add(new { monthNum = m, monthName = new DateTime(y, m, 1).ToString("MMMM"), sales, purchases, expenses, salaries = monthlySalary, totalCost, net });
-        }
-
-        ViewBag.Rows          = rows;
+        ViewBag.Month         = m;
+        ViewBag.MonthName     = monthStart.ToString("MMMM");
         ViewBag.Year          = y;
-        ViewBag.MaxMonth      = maxMonth;
         ViewBag.Company       = company;
         ViewBag.MonthlySalary = monthlySalary;
         ViewBag.EmployeeCount = employees.Count;
-        ViewBag.TotSales      = totSales;
-        ViewBag.TotPurchases  = totPurchases;
-        ViewBag.TotExpenses   = totExpenses;
-        ViewBag.TotSalaries   = totSalaries;
-        ViewBag.TotNet        = totNet;
+        // Per-employee salary breakdown for the detailed expense section
+        ViewBag.Employees     = employees
+            .OrderByDescending(e => e.Salary)
+            .Select(e => new { name = e.Name, role = e.Role ?? "—", salary = e.Salary })
+            .ToList<object>();
+        ViewBag.Sales         = sales;
+        ViewBag.Purchases     = purchases;
+        ViewBag.Expenses      = expenses;
+        ViewBag.Salaries      = monthlySalary;
+        ViewBag.TotalCost     = totalCost;
+        ViewBag.Net           = net;
         return View();
     }
 
@@ -242,6 +269,7 @@ public class ReportController : Controller
             category     = p.Category?.Name ?? "—",
             unit         = p.Unit?.Name ?? "—",
             currentStock = stockMap.FirstOrDefault(s => s.ProductId == p.Id)?.Qty ?? 0,
+            reorderLevel = p.ReorderLevel,
             inQty        = stockIn.FirstOrDefault(s => s.ProductId  == p.Id)?.Qty   ?? 0,
             inValue      = stockIn.FirstOrDefault(s => s.ProductId  == p.Id)?.Value ?? 0,
             outQty       = stockOut.FirstOrDefault(s => s.ProductId == p.Id)?.Qty   ?? 0,

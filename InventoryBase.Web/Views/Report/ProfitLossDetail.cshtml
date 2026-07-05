@@ -2,22 +2,24 @@
     Layout = null;
     var company       = ViewBag.Company as InventoryBase.Core.Entities.CompanySettings;
     int    rptYear    = (int)ViewBag.Year;
-    int    maxMonth   = (int)ViewBag.MaxMonth;
+    int    rptMonth   = (int)ViewBag.Month;
+    string monthName  = (string)ViewBag.MonthName;
     int    empCount   = (int)ViewBag.EmployeeCount;
     decimal monthlySal = (decimal)ViewBag.MonthlySalary;
-    decimal totSales  = (decimal)ViewBag.TotSales;
-    decimal totPurch  = (decimal)ViewBag.TotPurchases;
-    decimal totExp    = (decimal)ViewBag.TotExpenses;
-    decimal totSal    = (decimal)ViewBag.TotSalaries;
-    decimal totNet    = (decimal)ViewBag.TotNet;
-    string  netColor  = totNet >= 0 ? "#198754" : "#dc3545";
+    decimal sales     = (decimal)ViewBag.Sales;
+    decimal purchases = (decimal)ViewBag.Purchases;
+    decimal expenses  = (decimal)ViewBag.Expenses;
+    decimal salaries  = (decimal)ViewBag.Salaries;
+    decimal totalCost = (decimal)ViewBag.TotalCost;
+    decimal net       = (decimal)ViewBag.Net;
+    string  netColor  = net >= 0 ? "#198754" : "#dc3545";
 }
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Profit &amp; Loss — @rptYear</title>
+<title>Profit &amp; Loss — @monthName @rptYear</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: Arial, sans-serif; font-size: 13px; color: #111; background: #e8e8e8; line-height: 1.5; }
@@ -102,83 +104,119 @@
 
   <!-- title bar -->
   <div class="inv-title-bar">
-    <span class="title">Profit &amp; Loss Statement — @rptYear</span>
-    <span class="sub">@(maxMonth == 12 ? "Full Year" : $"Jan — {new DateTime(rptYear, maxMonth, 1).ToString("MMM")}") &nbsp;|&nbsp; Cash-Flow Basis</span>
+    <span class="title">Profit &amp; Loss Statement — @monthName @rptYear</span>
+    <span class="sub">Monthly &nbsp;|&nbsp; Cash-Flow Basis</span>
   </div>
 
   <!-- KPI summary -->
   <div class="kpi-row">
     <div class="kpi-cell">
-      <div class="kpi-lbl">Total Revenue</div>
-      <div class="kpi-val" style="color:#0f3460">৳ @totSales.ToString("N2")</div>
+      <div class="kpi-lbl">Revenue</div>
+      <div class="kpi-val" style="color:#0f3460">৳ @sales.ToString("N2")</div>
     </div>
     <div class="kpi-cell">
       <div class="kpi-lbl">Total Costs</div>
-      <div class="kpi-val" style="color:#dc3545">৳ @((totPurch + totExp + totSal).ToString("N2"))</div>
+      <div class="kpi-val" style="color:#dc3545">৳ @totalCost.ToString("N2")</div>
     </div>
     <div class="kpi-cell">
       <div class="kpi-lbl">Net Profit / Loss</div>
-      <div class="kpi-val" style="color:@netColor">৳ @totNet.ToString("N2")</div>
+      <div class="kpi-val" style="color:@netColor">৳ @net.ToString("N2")</div>
     </div>
     <div class="kpi-cell">
-      <div class="kpi-lbl">Months Covered</div>
-      <div class="kpi-val" style="color:#555">@maxMonth / 12</div>
+      <div class="kpi-lbl">Period</div>
+      <div class="kpi-val" style="color:#555;font-size:14px">@monthName @rptYear</div>
     </div>
   </div>
 
   <!-- employee note -->
   <div class="note-bar">
-    Salary column: ৳ @monthlySal.ToString("N2") / month &nbsp;(@empCount active @(empCount == 1 ? "employee" : "employees"))
+    Salaries: ৳ @monthlySal.ToString("N2") / month &nbsp;(@empCount active @(empCount == 1 ? "employee" : "employees"))
     &nbsp;·&nbsp; Only confirmed expenses are included.
     &nbsp;·&nbsp; Purchase cost = actual invoiced amount (not COGS).
   </div>
 
-  <!-- month-wise table -->
+  <!-- single-month P&L breakdown -->
   <div class="tbl-wrap">
     <table class="rpt">
       <thead>
         <tr>
-          <th style="width:110px">Month</th>
-          <th class="r">Sales Revenue</th>
-          <th class="r">Purchase Cost</th>
-          <th class="r">Expenses</th>
-          <th class="r">Salaries</th>
-          <th class="r">Total Cost</th>
-          <th class="r">Net Profit / Loss</th>
+          <th>Item</th>
+          <th class="r">Amount</th>
         </tr>
       </thead>
       <tbody>
-        @if (maxMonth == 0)
+        <tr>
+          <td style="font-weight:600">Sales Revenue</td>
+          <td class="r">@(sales == 0 ? "—" : "৳ " + sales.ToString("N2"))</td>
+        </tr>
+        <tr>
+          <td style="color:#dc3545">Less: Purchase Cost</td>
+          <td class="r" style="color:#dc3545">@(purchases == 0 ? "—" : "− ৳ " + purchases.ToString("N2"))</td>
+        </tr>
+        <tr>
+          <td style="color:#dc3545">Less: Confirmed Expenses</td>
+          <td class="r" style="color:#dc3545">@(expenses == 0 ? "—" : "− ৳ " + expenses.ToString("N2"))</td>
+        </tr>
+        <tr>
+          <td style="color:#dc3545">Less: Salaries</td>
+          <td class="r" style="color:#dc3545">@(salaries == 0 ? "—" : "− ৳ " + salaries.ToString("N2"))</td>
+        </tr>
+        <tr>
+          <td style="font-weight:600">Total Cost</td>
+          <td class="r" style="font-weight:600">৳ @totalCost.ToString("N2")</td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr>
+          <td>NET PROFIT / LOSS</td>
+          <td class="r">@(net < 0 ? "" : "+")৳ @net.ToString("N2")</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <!-- salary breakdown: itemises the monthly Salaries figure per employee -->
+  @{ var salaryRows = ViewBag.Employees as System.Collections.IEnumerable; }
+  <div class="tbl-wrap">
+    <div style="font-size:12.5px;font-weight:700;color:#0f3460;text-transform:uppercase;letter-spacing:.05em;margin-top:20px">
+      Salary Breakdown
+      <span style="font-weight:400;text-transform:none;color:#777;font-size:11.5px">— per active employee for @monthName @rptYear</span>
+    </div>
+    <table class="rpt" style="margin-top:8px">
+      <thead>
+        <tr>
+          <th style="width:40px" class="r">#</th>
+          <th>Employee</th>
+          <th>Role</th>
+          <th class="r">Monthly Salary</th>
+        </tr>
+      </thead>
+      <tbody>
+        @if (empCount == 0)
         {
-          <tr><td colspan="7" style="text-align:center;color:#aaa;padding:24px">No data for @rptYear yet.</td></tr>
+          <tr><td colspan="4" style="text-align:center;color:#aaa;padding:20px">No active employees.</td></tr>
         }
-        @foreach (dynamic row in ViewBag.Rows)
+        else
         {
-          decimal net = (decimal)row.net;
-          string rowNetColor = net >= 0 ? "#198754" : "#dc3545";
-          <tr>
-            <td style="font-weight:600">@row.monthName</td>
-            <td class="r">@((decimal)row.sales == 0 ? "—" : "৳ " + ((decimal)row.sales).ToString("N2"))</td>
-            <td class="r" style="color:#dc3545">@((decimal)row.purchases == 0 ? "—" : "৳ " + ((decimal)row.purchases).ToString("N2"))</td>
-            <td class="r" style="color:#dc3545">@((decimal)row.expenses == 0 ? "—" : "৳ " + ((decimal)row.expenses).ToString("N2"))</td>
-            <td class="r" style="color:#dc3545">৳ @((decimal)row.salaries).ToString("N2")</td>
-            <td class="r">৳ @((decimal)row.totalCost).ToString("N2")</td>
-            <td class="r" style="font-weight:700;color:@rowNetColor">@(net < 0 ? "" : "+")৳ @net.ToString("N2")</td>
-          </tr>
+          int sIdx = 0;
+          foreach (dynamic emp in salaryRows)
+          {
+            sIdx++;
+            <tr>
+              <td class="r">@sIdx</td>
+              <td style="font-weight:600">@emp.name</td>
+              <td>@emp.role</td>
+              <td class="r">৳ @(((decimal)emp.salary).ToString("N2"))</td>
+            </tr>
+          }
         }
       </tbody>
-      @if (maxMonth > 0)
+      @if (empCount > 0)
       {
-        string totNetSign = totNet >= 0 ? "+" : "";
         <tfoot>
           <tr>
-            <td>TOTAL</td>
-            <td class="r">৳ @totSales.ToString("N2")</td>
-            <td class="r">৳ @totPurch.ToString("N2")</td>
-            <td class="r">৳ @totExp.ToString("N2")</td>
-            <td class="r">৳ @totSal.ToString("N2")</td>
-            <td class="r">৳ @((totPurch + totExp + totSal).ToString("N2"))</td>
-            <td class="r">@totNetSign৳ @totNet.ToString("N2")</td>
+            <td colspan="3">TOTAL</td>
+            <td class="r">৳ @monthlySal.ToString("N2")</td>
           </tr>
         </tfoot>
       }

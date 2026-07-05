@@ -35,17 +35,18 @@ public class StockController : Controller
 
         var rows = products.Select(p => {
             var qty    = stockMap.FirstOrDefault(s => s.ProductId == p.Id)?.Qty ?? 0;
-            string status = qty <= 0 ? "out" : qty < 10 ? "low" : "in stock";
+            string status = qty <= 0 ? "out" : qty <= p.ReorderLevel ? "low" : "in stock";
             return new {
-                hash      = _hash.Encode(p.Id),
-                name      = p.Name,
-                sku       = p.SKU,
-                category  = p.Category?.Name ?? "—",
-                unit      = p.Unit?.Name ?? "—",
-                qty       = qty,
-                costPrice = p.CostPrice,
-                stockVal  = qty * p.CostPrice,
-                status    = status
+                hash         = _hash.Encode(p.Id),
+                name         = p.Name,
+                sku          = p.SKU,
+                category     = p.Category?.Name ?? "—",
+                unit         = p.Unit?.Name ?? "—",
+                qty          = qty,
+                reorderLevel = p.ReorderLevel,
+                costPrice    = p.CostPrice,
+                stockVal     = qty * p.CostPrice,
+                status       = status
             };
         }).AsQueryable();
 
@@ -92,12 +93,16 @@ public class StockController : Controller
             .Where(p => p.IsActive)
             .ToListAsync();
 
-        decimal totalValue = products.Sum(p => {
-            var qty = stockMap.FirstOrDefault(s => s.ProductId == p.Id)?.Qty ?? 0;
-            return qty * p.CostPrice;
-        });
-        int lowCount = stockMap.Count(s => s.Qty > 0 && s.Qty < 10);
-        int outCount = stockMap.Count(s => s.Qty <= 0);
+        // Compute per-product qty (products with no ledger entry = 0 stock).
+        var withQty = products.Select(p => new {
+            p.CostPrice,
+            p.ReorderLevel,
+            Qty = stockMap.FirstOrDefault(s => s.ProductId == p.Id)?.Qty ?? 0
+        }).ToList();
+
+        decimal totalValue = withQty.Sum(x => x.Qty * x.CostPrice);
+        int lowCount = withQty.Count(x => x.Qty > 0 && x.Qty <= x.ReorderLevel);
+        int outCount = withQty.Count(x => x.Qty <= 0);
 
         return Json(new { totalValue, lowCount, outCount, totalProducts = products.Count });
     }

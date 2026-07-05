@@ -65,6 +65,12 @@
                 <input class="input mono" asp-for="SalePrice"/>
                 <span asp-validation-for="SalePrice" class="hint" style="color:var(--danger)"></span>
               </div>
+              <div class="field span-2">
+                <label class="label">Low-stock alert level</label>
+                <input class="input mono" asp-for="ReorderLevel" type="number" min="0" step="0.001"/>
+                <div class="hint">Stock at or below this quantity is flagged as low. Default 10.</div>
+                <span asp-validation-for="ReorderLevel" class="hint" style="color:var(--danger)"></span>
+              </div>
             </div>
           </div>
         </div>
